@@ -1,13 +1,12 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Contractor Review Tracker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
 <style>
+/* Layout: one column. Title and storage status, PDF drop band, period controls,
+   summary strip, contractor table, trend chart, saved reports list. */
 :root {
   --bg: #f2f5f8;
   --surface: #ffffff;
@@ -24,7 +23,7 @@
   --warn-soft: #fbeccb;
   --bad: #b3261e;
   --bad-soft: #fbe0dd;
-  --font-body: "Inter", system-ui, -apple-system, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-head: "Space Grotesk", "Inter", system-ui, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
@@ -47,6 +46,25 @@
     color-scheme: dark;
   }
 }
+:root[data-theme="dark"] {
+  --bg: #0e141b;
+  --surface: #17202a;
+  --surface-2: #212c38;
+  --fg: #e6ebf1;
+  --muted: #9aa7b6;
+  --line: #2b3745;
+  --accent: #4cc0e0;
+  --accent-fg: #06222b;
+  --accent-soft: #143542;
+  --good: #5fd08c;
+  --good-soft: #163a27;
+  --warn: #f0b34a;
+  --warn-soft: #3b2d12;
+  --bad: #ff8a80;
+  --bad-soft: #431e1b;
+  color-scheme: dark;
+}
+
 * { box-sizing: border-box; }
 body {
   background: var(--bg);
@@ -54,12 +72,12 @@ body {
   font-family: var(--font-body);
   font-size: 14px;
   line-height: 1.5;
-  padding: 20px 16px 48px;
-  max-width: 1120px;
-  margin: 0 auto;
+  padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
-.wrap { display: flex; flex-direction: column; gap: 16px; }
-h1, h2 { font-family: var(--font-head); margin: 0; }
+.wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+h1, h2 { font-family: var(--font-head); margin: 0; text-wrap: balance; }
 h1 { font-size: 26px; line-height: 1.2; font-weight: 700; }
 h2 { font-size: 17px; font-weight: 700; }
 p { margin: 0; }
@@ -73,7 +91,8 @@ button { cursor: pointer; }
 .top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 16px; }
 .top .sub { color: var(--muted); margin-top: 2px; }
 .status { font-size: 12.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
-.status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+.status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.status.shared::before { background: var(--good); }
 .status.local::before { background: var(--warn); }
 
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
@@ -92,10 +111,13 @@ button { cursor: pointer; }
 .btn[disabled] { opacity: .5; cursor: not-allowed; }
 .msg-err { color: var(--bad); width: 100%; }
 
+.notice { padding: 8px 12px; border-radius: 6px; background: var(--warn-soft); color: var(--warn); font-size: 13px; }
+.notices { display: flex; flex-direction: column; gap: 6px; }
 .pv-grid { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; margin-bottom: 12px; }
 .field { display: flex; flex-direction: column; gap: 4px; }
 .field.inline { flex-direction: row; align-items: center; gap: 8px; }
 .mt12 { margin-top: 12px; }
+.rowend { display: flex; gap: 6px; justify-content: flex-end; }
 .field label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 input[type="date"], input[type="number"], select { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; min-height: 34px; }
 input[type="number"] { width: 84px; }
@@ -117,24 +139,30 @@ input[type="number"] { width: 84px; }
 .stat { padding: 14px 16px; border-right: 1px solid var(--line); min-width: 0; }
 .stat:last-child { border-right: 0; }
 .stat .k { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
-.stat .v { font-family: var(--font-head); font-size: 26px; font-weight: 700; line-height: 1.2; }
+.stat .v { font-family: var(--font-head); font-size: 26px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .stat { border-right: 0; border-bottom: 1px solid var(--line); }
+  .stat:last-child { border-bottom: 0; }
+}
 
 .scroll { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; min-width: 700px; }
+table { width: 100%; border-collapse: collapse; min-width: 620px; }
 th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
 tbody tr:last-child td { border-bottom: 0; }
 th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; white-space: nowrap; }
 th.r, td.r { text-align: right; }
-th button { background: none; border: 0; padding: 0; font-weight: inherit; color: inherit; display: inline-flex; gap: 5px; align-items: center; }
-th[aria-sort="ascending"] button::after { content: " ↑"; }
-th[aria-sort="descending"] button::after { content: " ↓"; }
+th button { background: none; border: 0; padding: 0; text-transform: inherit; letter-spacing: inherit; font-weight: inherit; color: inherit; display: inline-flex; gap: 5px; align-items: center; }
+th button:hover { color: var(--fg); }
+th[aria-sort="ascending"] button::after { content: "\2191"; }
+th[aria-sort="descending"] button::after { content: "\2193"; }
+th[aria-sort] button { color: var(--fg); }
 td .who { font-weight: 600; }
-td .em { color: var(--muted); font-size: 12.5px; }
+td .em { color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
 .pctcell { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
 .bar { width: 90px; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; flex: none; }
 .bar i { display: block; height: 100%; background: var(--accent); }
 .bar i.hi { background: var(--bad); }
-.pill { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+.pill { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .pill.good { background: var(--good-soft); color: var(--good); }
 .pill.bad { background: var(--bad-soft); color: var(--bad); }
 .pill.none { background: var(--surface-2); color: var(--muted); }
@@ -145,46 +173,48 @@ svg.chart { display: block; width: 100%; }
 svg.chart text { font-family: var(--font-body); font-size: 11.5px; fill: var(--muted); }
 svg.chart text.val { fill: var(--fg); font-weight: 600; }
 svg.chart .grid { stroke: var(--line); stroke-width: 1; }
+svg.chart .thr { stroke: var(--bad); stroke-width: 1; stroke-dasharray: 4 4; }
+svg.chart text.thrl { fill: var(--bad); }
 svg.chart .ln { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
 svg.chart .dot { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
+svg.chart .dot.last { fill: var(--accent); }
 
-#toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 6px; font-weight: 500; z-index: 20; }
+#toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 6px; font-weight: 500; max-width: calc(100% - 32px); z-index: 20; }
+@media (prefers-reduced-motion: reduce) { .drop { transition: none; } }
 </style>
-</head>
-<body>
 
 <div class="wrap">
   <header class="top">
     <div>
       <h1>Contractor Review Tracker</h1>
-      <p class="sub">Moderation human review tracker built from client PDF reports</p>
+      <p class="sub">Moderation human review, built from the client's PDF reports</p>
     </div>
-    <span id="status" class="status local">Saved in this browser (Local)</span>
+    <span id="status" class="status">Loading saved reports</span>
   </header>
 
-  <section id="drop" class="drop">
+  <section id="drop" class="drop" aria-label="Add a report">
     <div class="txt">
       <strong>Drop the client's PDF report here</strong>
-      <span class="muted small">Parsed securely in your browser. Contractors are matched by email.</span>
+      <span class="muted small">The file is read in your browser. Contractors are matched by email.</span>
     </div>
     <button id="pick" class="btn primary" type="button">Choose PDF</button>
     <input id="file" type="file" accept="application/pdf,.pdf" hidden>
     <p id="dropErr" class="msg-err" role="alert" hidden></p>
   </section>
 
-  <section id="preview" class="panel" hidden></section>
+  <section id="preview" class="panel" hidden aria-label="Report preview"></section>
 
-  <section class="controls">
-    <div class="seg" role="group">
+  <section class="controls" aria-label="Period">
+    <div class="seg" role="group" aria-label="View by">
       <button type="button" data-mode="day" aria-pressed="false">Daily</button>
       <button type="button" data-mode="week" aria-pressed="false">Weekly</button>
       <button type="button" data-mode="month" aria-pressed="false">Monthly</button>
       <button type="button" data-mode="all" aria-pressed="false">All time</button>
     </div>
     <div class="nav">
-      <button id="prev" class="btn" type="button">&#8249;</button>
-      <span id="plabel" class="lbl"></span>
-      <button id="next" class="btn" type="button">&#8250;</button>
+      <button id="prev" class="btn" type="button" aria-label="Previous period">&#8249;</button>
+      <span id="plabel" class="lbl" aria-live="polite"></span>
+      <button id="next" class="btn" type="button" aria-label="Next period">&#8250;</button>
       <button id="latest" class="btn" type="button">Latest</button>
     </div>
     <span class="spacer"></span>
@@ -195,19 +225,19 @@ svg.chart .dot { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
     <button id="csv" class="btn" type="button">Export CSV</button>
   </section>
 
-  <section class="panel">
+  <section class="panel" aria-label="Summary">
     <div id="stats" class="stats"></div>
   </section>
 
-  <section class="panel">
+  <section class="panel" aria-label="Contractors">
     <div class="panel-head"><h2>Contractors</h2><span id="tcount" class="muted small"></span></div>
     <div id="tableBox"></div>
     <p id="tfoot" class="foot"></p>
   </section>
 
-  <section class="panel">
+  <section class="panel" aria-label="Trend">
     <div class="panel-head">
-      <h2>% allowed trend</h2>
+      <h2>% allowed by day</h2>
       <div class="field inline">
         <label for="who">Show</label>
         <select id="who"></select>
@@ -216,7 +246,7 @@ svg.chart .dot { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
     <div class="panel-body"><div id="trendBox"></div></div>
   </section>
 
-  <section class="panel">
+  <section class="panel" aria-label="Saved reports">
     <div class="panel-head"><h2>Saved reports</h2><span id="rcount" class="muted small"></span></div>
     <div id="reportsBox" class="scroll"></div>
   </section>
@@ -225,16 +255,12 @@ svg.chart .dot { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
+// PARSER START
 var MONTHS = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
 function pad(n) { return String(n).padStart(2, '0'); }
-
-function parseNum(s) {
-  var clean = String(s).trim().replace(/,/g, '');
-  var mK = clean.match(/^([\d.]+)\s*[kK]$/);
-  if (mK) return Math.round(parseFloat(mK[1]) * 1000);
-  return Number(clean);
-}
-
+function to24(h, m, ap) { var x = Number(h) % 12; if (/pm/i.test(ap)) x += 12; return pad(x) + ':' + m; }
+function parseNum(s) { return Number(String(s).replace(/,/g, '')); }
+function validEmail(e) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); }
 function displayName(email) {
   var local = String(email).split('@')[0];
   return local.split(/[._-]+/).filter(Boolean).map(function (p) { return p.charAt(0).toUpperCase() + p.slice(1); }).join(' ') || email;
@@ -242,11 +268,9 @@ function displayName(email) {
 var TABLES = [
   ['skip', /caught and removed by contractors/i, ''],
   ['reviewed', /review counts by contractor/i, 'Review counts by contractor'],
-  ['rejected', /comments rejected by the moderation system/i, 'Comments rejected by the Moderation system'],
   ['allowed', /content caught by moderation system and allowed by contractor/i, 'Content caught by moderation system and allowed by contractor']
 ];
-var ROW = /^(\S+@\S+)\s+([\d,.]+\s*[kK]?)(?:\s+([\d,.]+\s*[kK]?))?(?:\s+(\d+(?:\.\d+)?)\s*%)?$/;
-
+var ROW = /^(\S+@\S+)\s+([\d,]+)(?:\s+(\d+(?:\.\d+)?)\s*%)?$/;
 function parseReport(lines, fileName, headline) {
   var warnings = [];
   headline = headline || {};
@@ -257,13 +281,18 @@ function parseReport(lines, fileName, headline) {
   if (hm && MONTHS[hm[1].toLowerCase()]) {
     var year = fm ? fm[1] : String(new Date().getFullYear());
     date = year + '-' + pad(MONTHS[hm[1].toLowerCase()]) + '-' + pad(hm[2]);
+    start = to24(hm[3], hm[4], hm[5]);
+    end = to24(hm[8], hm[9], hm[10]);
   } else if (fm) {
     date = fm[0];
+    warnings.push('The time range in the PDF header could not be read. The date comes from the file name.');
   } else {
-    date = new Date().toISOString().split('T')[0];
+    warnings.push('The report date could not be read. Choose it below before saving.');
   }
+  var tzm = text.match(/\b([A-Z][A-Za-z]+\/[A-Z][A-Za-z_]+)\b/);
+  if (tzm) tz = tzm[1];
 
-  var sec = { reviewed: [], rejected: [], allowed: [] }, seen = {}, cur = null;
+  var sec = { reviewed: [], allowed: [] }, seen = {}, cur = null;
   lines.forEach(function (line) {
     var l = line.trim(), hit = null;
     TABLES.forEach(function (t) { if (t[1].test(l)) hit = t[0]; });
@@ -271,23 +300,41 @@ function parseReport(lines, fileName, headline) {
     if (!cur || cur === 'skip') return;
     var m = l.match(ROW);
     if (!m) return;
-    var val = parseNum(m[2]);
-    sec[cur].push({ email: m[1].toLowerCase(), n: val, pct: m[4] != null ? parseFloat(m[4]) : null });
+    sec[cur].push({ email: m[1].toLowerCase(), n: parseNum(m[2]), pct: m[3] != null ? parseFloat(m[3]) : null });
   });
 
   var map = {}, order = [];
   function get(e) {
-    if (!map[e]) { map[e] = { email: e, reviewed: 0, rejected: 0, allowed: 0 }; order.push(e); }
+    if (!map[e]) { map[e] = { email: e, reviewed: 0, allowed: 0, pct: null }; order.push(e); }
     return map[e];
   }
   sec.reviewed.forEach(function (r) { get(r.email).reviewed = r.n; });
-  sec.rejected.forEach(function (r) { get(r.email).rejected = r.n; });
-  sec.allowed.forEach(function (r) { var o = get(r.email); o.allowed = r.n; });
+  var inAllowed = {};
+  sec.allowed.forEach(function (r) { var o = get(r.email); o.allowed = r.n; o.pct = r.pct; inAllowed[r.email] = true; });
+  if (seen.allowed) order.forEach(function (e) { if (!inAllowed[e]) { map[e].allowed = 0; map[e].pct = 0; } });
+
+  TABLES.forEach(function (t) {
+    if (t[0] === 'skip') return;
+    if (!seen[t[0]]) warnings.push('The table "' + t[2] + '" was not found in this PDF.');
+    else if (!sec[t[0]].length) warnings.push('The table "' + t[2] + '" has no rows.');
+  });
+  var odd = order.filter(function (e) { return !validEmail(e); });
+  if (odd.length) warnings.push('These emails look cut off or unusual, check them: ' + odd.join(', ') + '.');
 
   var rows = order.map(function (e) { return map[e]; }).sort(function (a, b) { return b.reviewed - a.reviewed; });
-  return { date: date, rows: rows, reviewedTotal: headline.reviewed, rejected: headline.rejected };
+  var tableTotal = 0; rows.forEach(function (r) { tableTotal += r.reviewed; });
+  var hasRev = typeof headline.reviewed === 'number', hasRej = typeof headline.rejected === 'number';
+  if (!hasRev || !hasRej) {
+    warnings.push('The headline totals (comments reviewed, comments rejected by the moderation system) were not found in the PDF. They will be worked out from the tables.');
+  }
+  if (hasRev && headline.reviewed > tableTotal) {
+    warnings.push('The PDF says ' + headline.reviewed.toLocaleString('en-US') + ' comments were reviewed, but the contractor table adds up to ' + tableTotal.toLocaleString('en-US') + '. The other ' + (headline.reviewed - tableTotal).toLocaleString('en-US') + ' belong to contractors cut off from the table. They are counted in the totals but have no contractor row.');
+  }
+  return { date: date, start: start, end: end, tz: tz, rows: rows, warnings: warnings,
+    reviewedTotal: hasRev ? headline.reviewed : null, rejected: hasRej ? headline.rejected : null };
 }
-
+// Reads the big headline numbers (large type) that sit under a tile title.
+// items: [{s, x, y, size}] with y increasing upward, as PDF.js reports it.
 function findHeadlines(items) {
   var out = { reviewed: null, rejected: null };
   var bigs = items.filter(function (i) { return i.size >= 40 && i.s.trim(); });
@@ -310,7 +357,10 @@ function findHeadlines(items) {
   });
   return out;
 }
+// PARSER END
+</script>
 
+<script>
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
@@ -319,8 +369,8 @@ function findHeadlines(items) {
   var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   var LS_REPORTS = 'contractor-tracker:reports', LS_THR = 'contractor-tracker:threshold';
 
-  var store = { reports: [] };
-  var state = { mode: 'day', anchor: '', sortKey: 'pct', sortDir: 'desc', who: 'team', pending: null };
+  var store = { mode: 'loading', db: null, reports: [], downloads: null };
+  var state = { mode: 'day', anchor: '', sortKey: 'pct', sortDir: 'desc', who: 'team', pending: null, confirmDel: '' };
 
   function h(tag, props, kids) {
     var e = document.createElement(tag);
@@ -339,21 +389,27 @@ function findHeadlines(items) {
     return e;
   }
   function toast(msg) {
-    var t = $('toast'); t.textContent = msg; t.hidden = false;
+    var t = $('toast');
+    t.textContent = msg; t.hidden = false;
     clearTimeout(toast.t);
     toast.t = setTimeout(function () { t.hidden = true; }, 3200);
   }
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
 
+  /* ---------- formatting and dates ---------- */
   function fmtInt(n) { return Number(n).toLocaleString('en-US'); }
   function fmtPct(p) { return p == null ? '–' : p.toFixed(2) + '%'; }
+  function fmtTime(t) {
+    if (!t) return '';
+    var p = t.split(':'), hh = Number(p[0]), ap = hh >= 12 ? 'pm' : 'am';
+    return ((hh % 12) || 12) + ':' + p[1] + ' ' + ap;
+  }
   function ymdToDate(s) { var p = s.split('-'); return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])); }
   function dateToYmd(d) { return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
   function addDays(s, n) { var d = ymdToDate(s); d.setUTCDate(d.getUTCDate() + n); return dateToYmd(d); }
   function md(s) { var d = ymdToDate(s); return MON[d.getUTCMonth()] + ' ' + d.getUTCDate(); }
   function longDate(s) { var d = ymdToDate(s); return DOW[d.getUTCDay()] + ', ' + md(s) + ', ' + d.getUTCFullYear(); }
-  
   function periodOf(mode, anchor) {
     var d = ymdToDate(anchor);
     if (mode === 'all') {
@@ -363,7 +419,8 @@ function findHeadlines(items) {
     if (mode === 'day') return { from: anchor, to: anchor, label: longDate(anchor) };
     if (mode === 'week') {
       var from = addDays(anchor, -((d.getUTCDay() + 6) % 7)), to = addDays(from, 6);
-      return { from: from, to: to, label: md(from) + ' – ' + md(to) };
+      var yf = ymdToDate(from).getUTCFullYear(), yt = ymdToDate(to).getUTCFullYear();
+      return { from: from, to: to, label: md(from) + (yf !== yt ? ', ' + yf : '') + ' \u2013 ' + md(to) + ', ' + yt };
     }
     var y = d.getUTCFullYear(), m = d.getUTCMonth();
     return { from: y + '-' + pad(m + 1) + '-01', to: dateToYmd(new Date(Date.UTC(y, m + 1, 0))), label: MONFULL[m] + ' ' + y };
@@ -375,98 +432,153 @@ function findHeadlines(items) {
     var d = ymdToDate(anchor); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + dir);
     return dateToYmd(d);
   }
+  function todayYmd() { var n = new Date(); return n.getFullYear() + '-' + pad(n.getMonth() + 1) + '-' + pad(n.getDate()); }
   function latestDate() {
     var d = ''; store.reports.forEach(function (r) { if (r.date > d) d = r.date; });
     return d;
   }
   function getThreshold() { var v = parseFloat($('thr').value); return isNaN(v) ? 0 : v; }
 
+  /* ---------- aggregation ---------- */
   function aggregate(reports) {
     var map = {};
     reports.forEach(function (r) {
       r.rows.forEach(function (row) {
         var k = String(row.email).toLowerCase();
-        var a = map[k] || (map[k] = { email: k, reviewed: 0, rejected: 0, allowed: 0 });
+        var a = map[k] || (map[k] = { email: k, reviewed: 0, allowed: 0, base: 0 });
         a.reviewed += row.reviewed || 0;
-        a.rejected += row.rejected || 0;
         a.allowed += row.allowed || 0;
+        if (row.allowed > 0 && row.pct > 0) a.base += row.allowed * 100 / row.pct;
       });
     });
-    var totalAllowed = 0;
-    var list = Object.keys(map).map(function (k) { return map[k]; });
-    list.forEach(function (a) { totalAllowed += a.allowed; });
-
-    list.forEach(function (a) {
-      a.pct = totalAllowed > 0 ? (a.allowed / totalAllowed) * 100 : 0;
+    return Object.keys(map).map(function (k) {
+      var a = map[k];
+      a.pct = a.base > 0 ? a.allowed * 100 / a.base : (a.allowed === 0 ? 0 : null);
+      return a;
     });
-    return list;
   }
-
+  function reportBase(r) {
+    var b = 0;
+    r.rows.forEach(function (x) { if (x.allowed > 0 && x.pct > 0) b += x.allowed * 100 / x.pct; });
+    return b;
+  }
+  // Totals for any set of reports. Uses the PDF headline numbers when a report has them,
+  // otherwise works them out from the contractor tables.
   function periodTotals(reports) {
-    var t = { reviewed: 0, allowed: 0, rejected: 0 };
+    var t = { reviewed: 0, allowed: 0, rejected: 0, unlisted: 0 };
     reports.forEach(function (r) {
-      r.rows.forEach(function (x) {
-        t.reviewed += x.reviewed || 0;
-        t.allowed += x.allowed || 0;
-        t.rejected += x.rejected || 0;
-      });
+      var rowRev = 0, al = 0;
+      r.rows.forEach(function (x) { rowRev += x.reviewed || 0; al += x.allowed || 0; });
+      var rev = typeof r.reviewedTotal === 'number' ? r.reviewedTotal : rowRev;
+      t.reviewed += rev;
+      t.allowed += al;
+      t.rejected += typeof r.rejected === 'number' ? r.rejected : reportBase(r);
+      if (rev > rowRev) t.unlisted += rev - rowRev;
     });
-    t.pct = t.rejected > 0 ? (t.allowed / t.rejected) * 100 : 0;
+    t.pct = t.rejected > 0 ? t.allowed * 100 / t.rejected : 0;
     return t;
   }
-
   function inPeriod() {
     if (!state.anchor) return [];
     var p = periodOf(state.mode, state.anchor);
     return store.reports.filter(function (r) { return r.date >= p.from && r.date <= p.to; });
   }
 
+  /* ---------- storage ---------- */
+  function validDoc(d) { return d && typeof d.date === 'string' && Array.isArray(d.rows); }
   function sortReports() {
-    store.reports.sort(function (a, b) { return a.date.localeCompare(b.date); });
+    store.reports.sort(function (a, b) { return a.date === b.date ? String(a.start).localeCompare(String(b.start)) : a.date.localeCompare(b.date); });
   }
-  function loadLocal() {
-    try { store.reports = JSON.parse(lsGet(LS_REPORTS) || '[]'); } catch (e) { store.reports = []; }
+  function onReports(list) {
+    store.reports = list.filter(validDoc);
     sortReports();
     if (!state.anchor && store.reports.length) state.anchor = latestDate();
     renderAll();
   }
+  function loadLocal() {
+    var list = [];
+    try { list = JSON.parse(lsGet(LS_REPORTS) || '[]'); } catch (e) { list = []; }
+    onReports(Array.isArray(list) ? list : []);
+  }
   function saveLocal() { lsSet(LS_REPORTS, JSON.stringify(store.reports)); }
+
+  function initStorage() {
+    var api = window.claude;
+    var none = Promise.resolve(null);
+    var useDb = api && api.use ? api.use('db').catch(function () { return null; }) : none;
+    var useDl = api && api.use ? api.use('downloads').catch(function () { return null; }) : none;
+    Promise.all([useDb, useDl]).then(function (res) {
+      var db = res[0];
+      store.downloads = res[1];
+      if (!db) {
+        store.mode = 'local';
+        loadLocal();
+        return;
+      }
+      store.db = db; store.mode = 'shared';
+      renderStatus();
+      var timer = setTimeout(function () {
+        $('status').textContent = 'Shared history is slow to respond. Showing what is loaded.';
+      }, 10000);
+      db.collection('reports').onSnapshot(function (snap) {
+        clearTimeout(timer);
+        onReports(snap.docs.map(function (d) { return Object.assign({}, d.data(), { id: d.id }); }));
+      }, function (err) {
+        clearTimeout(timer);
+        store.mode = 'local';
+        toast('Shared history stopped (' + (err && err.code || 'error') + '). Switched to this browser.');
+        loadLocal();
+      });
+    });
+  }
+  function reportId(date, start, end) {
+    return date + '_' + (start ? start.replace(':', '') : 'x') + '-' + (end ? end.replace(':', '') : 'x');
+  }
   function persistReport(rep) {
-    store.reports = store.reports.filter(function (r) { return r.date !== rep.date; });
+    if (store.mode === 'shared') {
+      var body = Object.assign({}, rep); delete body.id;
+      return store.db.doc('reports/' + rep.id).set(body);
+    }
+    store.reports = store.reports.filter(function (r) { return r.id !== rep.id; });
     store.reports.push(rep); sortReports(); saveLocal();
     return Promise.resolve();
   }
   function removeReport(id) {
-    store.reports = store.reports.filter(function (r) { return r.date !== id; });
+    if (store.mode === 'shared') return store.db.doc('reports/' + id).delete();
+    store.reports = store.reports.filter(function (r) { return r.id !== id; });
     saveLocal();
     return Promise.resolve();
   }
 
+  /* ---------- PDF reading ---------- */
   function extractLines(file) {
+    if (!window.pdfjsLib) return Promise.reject(new Error('The PDF reader did not load. Check your connection and reload the page.'));
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     return file.arrayBuffer().then(function (buf) {
       return pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
     }).then(function (pdf) {
       var all = [], head = { reviewed: null, rejected: null }, chain = Promise.resolve();
-      for (let i = 1; i <= pdf.numPages; i++) {
-        chain = chain.then(function () { return pdf.getPage(i); }).then(function (page) { return page.getTextContent(); }).then(function (tc) {
-          var items = tc.items.filter(function (it) { return it.str && it.str.trim(); }).map(function (it) {
-            return { s: it.str, x: it.transform[4], y: it.transform[5], w: it.width || 0, size: Math.hypot(it.transform[2], it.transform[3]) };
+      for (var i = 1; i <= pdf.numPages; i++) {
+        (function (n) {
+          chain = chain.then(function () { return pdf.getPage(n); }).then(function (page) { return page.getTextContent(); }).then(function (tc) {
+            var items = tc.items.filter(function (it) { return it.str && it.str.trim(); }).map(function (it) {
+              return { s: it.str, x: it.transform[4], y: it.transform[5], w: it.width || 0, size: Math.hypot(it.transform[2], it.transform[3]) };
+            });
+            var hl = findHeadlines(items);
+            if (head.reviewed === null) head.reviewed = hl.reviewed;
+            if (head.rejected === null) head.rejected = hl.rejected;
+            items.sort(function (a, b) { return Math.abs(b.y - a.y) > 3 ? b.y - a.y : a.x - b.x; });
+            var cur = null, curY = null;
+            items.forEach(function (it) {
+              if (cur === null || Math.abs(it.y - curY) > 3) {
+                if (cur) all.push(cur.parts);
+                cur = { parts: [] }; curY = it.y;
+              }
+              cur.parts.push(it);
+            });
+            if (cur) all.push(cur.parts);
           });
-          var hl = findHeadlines(items);
-          if (head.reviewed === null) head.reviewed = hl.reviewed;
-          if (head.rejected === null) head.rejected = hl.rejected;
-          items.sort(function (a, b) { return Math.abs(b.y - a.y) > 3 ? b.y - a.y : a.x - b.x; });
-          var cur = null, curY = null;
-          items.forEach(function (it) {
-            if (cur === null || Math.abs(it.y - curY) > 3) {
-              if (cur) all.push(cur.parts);
-              cur = { parts: [] }; curY = it.y;
-            }
-            cur.parts.push(it);
-          });
-          if (cur) all.push(cur.parts);
-        });
+        })(i);
       }
       return chain.then(function () {
         var lines = all.map(function (parts) {
@@ -487,38 +599,106 @@ function findHeadlines(items) {
   function handleFile(file) {
     var err = $('dropErr'); err.hidden = true;
     if (!file) return;
+    if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
+      err.textContent = 'That file is not a PDF. Drop the report exactly as the client sent it.'; err.hidden = false; return;
+    }
     extractLines(file).then(function (res) {
       var parsed = parseReport(res.lines, file.name, res.headline);
+      if (!parsed.rows.length) {
+        err.textContent = 'No contractor rows were found in this PDF. Check that it is the Moderation - Human Review report.'; err.hidden = false; return;
+      }
       state.pending = { parsed: parsed, fileName: file.name };
       renderPreview();
+      $('preview').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }).catch(function (e) {
-      err.textContent = 'Could not read PDF file.'; err.hidden = false;
+      err.textContent = (e && e.message) || 'This PDF could not be read.'; err.hidden = false;
     });
   }
 
+  /* ---------- rendering ---------- */
+  function renderStatus() {
+    var s = $('status');
+    s.className = 'status ' + (store.mode === 'shared' ? 'shared' : store.mode === 'local' ? 'local' : '');
+    s.textContent = store.mode === 'shared' ? 'Shared history, saved for the whole team'
+      : store.mode === 'local' ? 'Saved in this browser only'
+      : 'Loading saved reports';
+  }
+
   function renderPreview() {
-    var box = $('preview'); var p = state.pending;
+    var box = $('preview');
+    var p = state.pending;
     if (!p) { box.hidden = true; box.textContent = ''; return; }
-    var parsed = p.parsed; box.hidden = false; box.textContent = '';
+    var parsed = p.parsed;
+    box.hidden = false; box.textContent = '';
+
     var dateInput = h('input', { id: 'pvDate', type: 'date', value: parsed.date || '' });
+    var replaceNote = h('div', { class: 'notice', hidden: true });
     var saveBtn = h('button', { class: 'btn primary', type: 'button', text: 'Save report' });
+    function refresh() {
+      var id = reportId(dateInput.value, parsed.start, parsed.end);
+      var exists = dateInput.value && store.reports.some(function (r) { return r.id === id; });
+      replaceNote.hidden = !exists;
+      replaceNote.textContent = exists ? 'A report for this date and time range is already saved. Saving will replace it.' : '';
+      saveBtn.disabled = !dateInput.value;
+    }
+    dateInput.addEventListener('input', refresh);
 
     saveBtn.addEventListener('click', function () {
-      var date = dateInput.value; if (!date) return;
-      var rep = { id: date, date: date, source: p.fileName, rows: parsed.rows };
+      var date = dateInput.value;
+      if (!date) return;
+      var rep = {
+        id: reportId(date, parsed.start, parsed.end), date: date, start: parsed.start, end: parsed.end, tz: parsed.tz,
+        source: p.fileName, savedAt: new Date().toISOString(), rows: parsed.rows,
+        reviewedTotal: parsed.reviewedTotal, rejected: parsed.rejected
+      };
+      saveBtn.disabled = true;
       persistReport(rep).then(function () {
-        state.pending = null; state.anchor = date;
+        state.pending = null; state.anchor = date; state.confirmDel = '';
         renderPreview(); renderAll();
-        toast('Report saved successfully');
+        toast('Report saved for ' + md(date));
+      }).catch(function (e) {
+        saveBtn.disabled = false;
+        toast(e && e.code === 'invalid_argument' ? 'You do not have permission to save reports here.' : 'The report could not be saved. Try again.');
       });
     });
 
-    box.appendChild(h('div', { class: 'panel-head' }, [h('h2', { text: 'Confirm Report' }), h('span', { class: 'muted small', text: p.fileName })]));
-    var body = h('div', { class: 'panel-body' }, [
-      h('div', { class: 'pv-grid' }, [h('div', { class: 'field' }, [h('label', { for: 'pvDate', text: 'Report Date' }), dateInput])]),
-      h('div', { class: 'actions' }, [saveBtn, h('button', { class: 'btn', type: 'button', text: 'Cancel', onclick: function () { state.pending = null; renderPreview(); } })])
+    var range = parsed.start ? fmtTime(parsed.start) + ' – ' + fmtTime(parsed.end) + (parsed.tz ? ' (' + parsed.tz + ')' : '') : 'Not found';
+    var thead = h('tr', null, [
+      h('th', { text: 'Contractor' }), h('th', { class: 'r', text: 'Reviewed' }),
+      h('th', { class: 'r', text: 'Comments allowed' }), h('th', { class: 'r', text: '% allowed' })
     ]);
+    var tbody = h('tbody', null, parsed.rows.map(function (r) {
+      return h('tr', null, [
+        h('td', null, [h('div', { class: 'who', text: displayName(r.email) }), h('div', { class: 'em', text: r.email })]),
+        h('td', { class: 'r num', text: fmtInt(r.reviewed) }),
+        h('td', { class: 'r num', text: r.allowed == null ? '–' : fmtInt(r.allowed) }), h('td', { class: 'r num', text: fmtPct(r.pct) })
+      ]);
+    }));
+
+    box.appendChild(h('div', { class: 'panel-head' }, [
+      h('h2', { text: 'Check before saving' }),
+      h('span', { class: 'muted small', text: p.fileName })
+    ]));
+    var body = h('div', { class: 'panel-body' }, [
+      h('div', { class: 'pv-grid' }, [
+        h('div', { class: 'field' }, [h('label', { for: 'pvDate', text: 'Report date' }), dateInput]),
+        h('div', { class: 'field' }, [h('label', { text: 'Time range in report' }), h('div', { text: range })]),
+        h('div', { class: 'field' }, [h('label', { text: 'Contractors found' }), h('div', { class: 'num', text: String(parsed.rows.length) })]),
+        h('div', { class: 'field' }, [h('label', { text: 'Reviewed (PDF total)' }), h('div', { class: 'num', text: parsed.reviewedTotal == null ? 'Not found' : fmtInt(parsed.reviewedTotal) })]),
+        h('div', { class: 'field' }, [h('label', { text: 'Rejected by moderation' }), h('div', { class: 'num', text: parsed.rejected == null ? 'Not found' : fmtInt(parsed.rejected) })])
+      ])
+    ]);
+    if (parsed.warnings.length) {
+      body.appendChild(h('div', { class: 'notices' }, parsed.warnings.map(function (w) { return h('div', { class: 'notice', text: w }); })));
+    }
+    body.appendChild(replaceNote);
+    body.appendChild(h('div', { class: 'scroll mt12' }, [h('table', null, [h('thead', null, [thead]), tbody])]));
+    body.appendChild(h('div', { class: 'actions' }, [
+      saveBtn,
+      h('button', { class: 'btn', type: 'button', text: 'Cancel', onclick: function () { state.pending = null; renderPreview(); } })
+    ]));
     box.appendChild(body);
+    refresh();
   }
 
   function sortRows(rows) {
@@ -535,31 +715,43 @@ function findHeadlines(items) {
   }
 
   function renderStats(rows, reps) {
-    var t = periodTotals(reps), box = $('stats'); box.textContent = '';
-    [
-      ['Comments Reviewed', rows.length ? fmtInt(t.reviewed) : '–'],
-      ['Comments Rejected', rows.length ? fmtInt(t.rejected) : '–'],
-      ['Comments Allowed (Error)', rows.length ? fmtInt(t.allowed) : '–'],
-      ['Team % Allowed', rows.length ? fmtPct(t.pct) : '–'],
-      ['Contractors', String(rows.length)]
-    ].forEach(function (it) {
+    var t = periodTotals(reps), box = $('stats'), has = reps.length > 0;
+    box.textContent = '';
+    var items = [
+      ['Comments reviewed', has ? fmtInt(t.reviewed) : '\u2013'],
+      ['Comments rejected by moderation', has ? fmtInt(Math.round(t.rejected)) : '\u2013'],
+      ['Comments allowed (error)', has ? fmtInt(t.allowed) : '\u2013'],
+      ['Team % allowed', has ? fmtPct(t.pct) : '\u2013'],
+      ['Contractors', String(rows.length)],
+      ['Reports in period', String(reps.length)]
+    ];
+    items.forEach(function (it) {
       box.appendChild(h('div', { class: 'stat' }, [h('div', { class: 'k', text: it[0] }), h('div', { class: 'v', text: it[1] })]));
     });
   }
 
   function renderTable() {
     var box = $('tableBox'); box.textContent = '';
-    var reps = inPeriod(); var rows = aggregate(reps);
+    var reps = inPeriod();
+    var rows = aggregate(reps);
     renderStats(rows, reps);
     $('tcount').textContent = rows.length ? rows.length + ' contractors' : '';
-    $('tfoot').textContent = 'Individual % Allowed = Contractor’s Comments Allowed ÷ Team’s Total Comments Allowed (Error).';
+    var foot = 'Error means content the moderation system caught and the contractor allowed. % allowed is comments allowed divided by comments the moderation system rejected.';
+    var tt = periodTotals(reps);
+    if (tt.unlisted > 0) foot += ' The totals above include ' + fmtInt(tt.unlisted) + ' reviews from contractors who are not listed in the PDF tables.';
+    $('tfoot').textContent = foot;
 
+    if (store.mode === 'loading') { box.appendChild(h('div', { class: 'empty', text: 'Loading saved reports' })); return; }
     if (!store.reports.length) {
-      box.appendChild(h('div', { class: 'empty' }, [h('p', { text: 'No reports saved yet. Drop your client PDF above to begin.' })]));
+      box.appendChild(h('div', { class: 'empty' }, [h('p', { text: 'No reports saved yet. Drop the client\u2019s PDF above to add the first one.' })]));
       return;
     }
     if (!rows.length) {
-      box.appendChild(h('div', { class: 'empty' }, [h('p', { text: 'No reports found for this timeframe.' })]));
+      var lat = latestDate();
+      box.appendChild(h('div', { class: 'empty' }, [
+        h('p', { text: 'No reports saved for ' + periodOf(state.mode, state.anchor).label + '.' }),
+        h('button', { class: 'btn', type: 'button', text: 'Go to latest report (' + md(lat) + ')', onclick: function () { state.anchor = lat; renderAll(); } })
+      ]));
       return;
     }
 
@@ -575,11 +767,14 @@ function findHeadlines(items) {
       if (state.sortKey === key) cell.setAttribute('aria-sort', state.sortDir === 'asc' ? 'ascending' : 'descending');
       return cell;
     }
-    var head = h('tr', null, [th('name', 'Contractor', false), th('reviewed', 'Comments Reviewed', true), th('allowed', 'Allowed (Error)', true), th('pct', '% Allowed', true), h('th', { text: 'Status' })]);
+    var head = h('tr', null, [
+      th('name', 'Contractor', false), th('reviewed', 'Reviewed', true),
+      th('allowed', 'Comments allowed', true), th('pct', '% allowed', true), h('th', { scope: 'col', text: 'Status' })
+    ]);
     var body = h('tbody', null, sortRows(rows).map(function (r) {
       var over = thr > 0 && r.pct != null && r.pct > thr;
-      var pill = r.pct == null || thr <= 0 ? h('span', { class: 'pill none', text: '–' })
-        : over ? h('span', { class: 'pill bad', text: 'Above Target' }) : h('span', { class: 'pill good', text: 'Normal' });
+      var pill = r.pct == null || thr <= 0 ? h('span', { class: 'pill none', text: r.pct == null ? 'No data' : 'No target' })
+        : over ? h('span', { class: 'pill bad', text: 'Above target' }) : h('span', { class: 'pill good', text: 'Within target' });
       var fill = h('i', { class: over ? 'hi' : '' });
       fill.style.width = Math.max(0, Math.min(100, (r.pct || 0) / maxPct * 100)) + '%';
       return h('tr', null, [
@@ -597,16 +792,26 @@ function findHeadlines(items) {
     document.querySelectorAll('.seg button').forEach(function (b) {
       b.setAttribute('aria-pressed', b.getAttribute('data-mode') === state.mode ? 'true' : 'false');
     });
-    $('plabel').textContent = state.anchor ? periodOf(state.mode, state.anchor).label : 'No reports';
+    $('plabel').textContent = state.anchor ? periodOf(state.mode, state.anchor).label : 'No reports yet';
+    var all = state.mode === 'all';
+    $('prev').disabled = !state.anchor || all;
+    $('next').disabled = !state.anchor || all;
+    $('latest').disabled = !state.anchor || all;
   }
 
   function renderWho() {
     var emails = {};
     store.reports.forEach(function (r) { r.rows.forEach(function (x) { emails[String(x.email).toLowerCase()] = true; }); });
     var list = Object.keys(emails).sort();
-    var sel = $('who'); sel.textContent = '';
-    sel.appendChild(h('option', { value: 'team', text: 'Whole team' }));
-    list.forEach(function (e) { sel.appendChild(h('option', { value: e, text: displayName(e) })); });
+    var sig = list.join('|');
+    var sel = $('who');
+    if (sel.getAttribute('data-sig') !== sig) {
+      sel.textContent = '';
+      sel.appendChild(h('option', { value: 'team', text: 'Whole team' }));
+      list.forEach(function (e) { sel.appendChild(h('option', { value: e, text: displayName(e) })); });
+      sel.setAttribute('data-sig', sig);
+    }
+    if (state.who !== 'team' && !emails[state.who]) state.who = 'team';
     sel.value = state.who;
   }
 
@@ -614,47 +819,60 @@ function findHeadlines(items) {
     var byDate = {};
     store.reports.forEach(function (r) { (byDate[r.date] = byDate[r.date] || []).push(r); });
     var out = [];
-    Object.keys(byDate).sort().forEach(function (d) {
-      var rows = aggregate(byDate[d]);
-      if (who !== 'team') rows = rows.filter(function (x) { return x.email === who; });
-      if (!rows.length) return;
-      var t = periodTotals(byDate[d]);
-      var allowed = who === 'team' ? t.allowed : rows[0].allowed;
-      var reviewed = who === 'team' ? t.reviewed : rows[0].reviewed;
-      out.push({ date: d, pct: who === 'team' ? t.pct : rows[0].pct, allowed: allowed, reviewed: reviewed });
+    Object.keys(byDate).sort().slice(-30).forEach(function (d) {
+      if (who === 'team') {
+        var t = periodTotals(byDate[d]);
+        out.push({ date: d, pct: t.pct, allowed: t.allowed, reviewed: t.reviewed });
+      } else {
+        var rows = aggregate(byDate[d]).filter(function (x) { return x.email === who; });
+        if (!rows.length) return;
+        out.push({ date: d, pct: rows[0].pct == null ? 0 : rows[0].pct, allowed: rows[0].allowed, reviewed: rows[0].reviewed });
+      }
     });
     return out;
   }
-
   function svg(tag, attrs, text) {
     var e = document.createElementNS('http://www.w3.org/2000/svg', tag);
     Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); });
     if (text != null) e.textContent = text;
     return e;
   }
-
+  function niceCeil(v) {
+    var steps = [5, 10, 15, 20, 25, 30, 40, 50, 60, 80, 100];
+    for (var i = 0; i < steps.length; i++) if (v <= steps[i]) return steps[i];
+    return 100;
+  }
   function drawTrend() {
     var box = $('trendBox'); box.textContent = '';
     var pts = trendSeries(state.who);
-    if (!pts.length) { box.appendChild(h('div', { class: 'empty', text: 'Trend chart appears after reports are saved.' })); return; }
+    if (!pts.length) { box.appendChild(h('div', { class: 'empty', text: 'The trend appears once a report is saved.' })); return; }
     var w = Math.max(280, box.clientWidth || 600), ht = 230, m = { l: 44, r: 20, t: 24, b: 30 };
-    var top = Math.max.apply(null, pts.map(function (p) { return p.pct; }).concat([15])) * 1.2;
+    var thr = getThreshold();
+    var top = niceCeil(Math.max.apply(null, pts.map(function (p) { return p.pct; }).concat([thr, 5])) * 1.1);
     var ph = ht - m.t - m.b;
     function Y(v) { return m.t + (1 - v / top) * ph; }
-    function X(i) { return pts.length === 1 ? w / 2 : m.l + i * (w - m.l - m.r) / (pts.length - 1); }
-    var s = svg('svg', { class: 'chart', width: w, height: ht, viewBox: '0 0 ' + w + ' ' + ht });
+    function X(i) { return pts.length === 1 ? (m.l + (w - m.r)) / 2 : m.l + i * (w - m.l - m.r) / (pts.length - 1); }
+    var s = svg('svg', { class: 'chart', width: w, height: ht, viewBox: '0 0 ' + w + ' ' + ht, role: 'img',
+      'aria-label': 'Line chart of percent allowed by day, ' + pts.length + ' day' + (pts.length === 1 ? '' : 's') });
     [0, top / 2, top].forEach(function (v) {
       s.appendChild(svg('line', { class: 'grid', x1: m.l, x2: w - m.r, y1: Y(v), y2: Y(v) }));
-      s.appendChild(svg('text', { x: m.l - 8, y: Y(v) + 4, 'text-anchor': 'end' }, Math.round(v) + '%'));
+      s.appendChild(svg('text', { x: m.l - 8, y: Y(v) + 4, 'text-anchor': 'end' }, (Math.round(v * 10) / 10) + '%'));
     });
+    if (thr > 0 && thr <= top) {
+      s.appendChild(svg('line', { class: 'thr', x1: m.l, x2: w - m.r, y1: Y(thr), y2: Y(thr) }));
+      s.appendChild(svg('text', { class: 'thrl', x: w - m.r, y: Y(thr) - 5, 'text-anchor': 'end' }, 'Flag at ' + thr + '%'));
+    }
     if (pts.length > 1) {
       s.appendChild(svg('path', { class: 'ln', d: pts.map(function (p, i) { return (i ? 'L' : 'M') + X(i) + ' ' + Y(p.pct); }).join(' ') }));
     }
+    var every = Math.ceil(pts.length / 6);
     pts.forEach(function (p, i) {
-      var dot = svg('circle', { class: 'dot', cx: X(i), cy: Y(p.pct), r: 4.5 });
+      var last = i === pts.length - 1;
+      var dot = svg('circle', { class: 'dot' + (last ? ' last' : ''), cx: X(i), cy: Y(p.pct), r: 4.5 });
+      dot.appendChild(svg('title', {}, md(p.date) + ': ' + fmtPct(p.pct) + ' (' + p.allowed + ' allowed of ' + p.reviewed + ' reviewed)'));
       s.appendChild(dot);
-      s.appendChild(svg('text', { class: 'val', x: X(i), y: Y(p.pct) - 11, 'text-anchor': 'middle' }, p.pct.toFixed(1) + '%'));
-      s.appendChild(svg('text', { x: X(i), y: ht - 9, 'text-anchor': 'middle' }, md(p.date)));
+      if (pts.length <= 8 || last) s.appendChild(svg('text', { class: 'val', x: X(i), y: Y(p.pct) - 11, 'text-anchor': 'middle' }, p.pct.toFixed(1) + '%'));
+      if (i % every === 0 || last) s.appendChild(svg('text', { x: X(i), y: ht - 9, 'text-anchor': 'middle' }, md(p.date)));
     });
     box.appendChild(s);
   }
@@ -662,42 +880,70 @@ function findHeadlines(items) {
   function renderReports() {
     var box = $('reportsBox'); box.textContent = '';
     $('rcount').textContent = store.reports.length ? store.reports.length + ' saved' : '';
-    if (!store.reports.length) { box.appendChild(h('div', { class: 'empty', text: 'No reports saved.' })); return; }
+    if (!store.reports.length) { box.appendChild(h('div', { class: 'empty', text: 'Nothing saved yet.' })); return; }
     var list = store.reports.slice().reverse();
-    var head = h('tr', null, ['Date', 'Contractors', 'Reviewed', 'File', ''].map(function (t, i) { return h('th', { class: i === 1 || i === 2 ? 'r' : '', text: t }); }));
+    var head = h('tr', null, ['Date', 'Time range', 'Contractors', 'Reviewed', 'File', ''].map(function (t, i) {
+      return h('th', { class: i === 2 || i === 3 ? 'r' : '', text: t });
+    }));
     var body = h('tbody', null, list.map(function (r) {
+      var rev = 0; r.rows.forEach(function (x) { rev += x.reviewed || 0; });
+      var cell;
+      if (state.confirmDel === r.id) {
+        cell = h('div', { class: 'rowend' }, [
+          h('button', { class: 'btn danger', type: 'button', text: 'Remove report', onclick: function () {
+            removeReport(r.id).then(function () { state.confirmDel = ''; renderAll(); toast('Report removed'); })
+              .catch(function () { toast('You do not have permission to remove reports here.'); });
+          } }),
+          h('button', { class: 'btn', type: 'button', text: 'Keep', onclick: function () { state.confirmDel = ''; renderReports(); } })
+        ]);
+      } else {
+        cell = h('div', { class: 'rowend' }, [h('button', { class: 'btn', type: 'button', text: 'Remove', onclick: function () { state.confirmDel = r.id; renderReports(); } })]);
+      }
       return h('tr', null, [
         h('td', { class: 'num', text: longDate(r.date) }),
+        h('td', { text: r.start ? fmtTime(r.start) + ' – ' + fmtTime(r.end) : 'Not recorded' }),
         h('td', { class: 'r num', text: String(r.rows.length) }),
-        h('td', { class: 'r num', text: fmtInt(r.rows.reduce(function(a, b){return a + b.reviewed}, 0)) }),
+        h('td', { class: 'r num', text: fmtInt(rev) }),
         h('td', { class: 'em muted', text: r.source || '' }),
-        h('td', null, [h('button', { class: 'btn danger', type: 'button', text: 'Remove', onclick: function () {
-          removeReport(r.date).then(function () { renderAll(); toast('Report removed'); });
-        } })])
+        h('td', null, [cell])
       ]);
     }));
     box.appendChild(h('table', null, [h('thead', null, [head]), body]));
   }
 
+  function renderAll() {
+    renderStatus(); renderControls(); renderTable(); renderWho(); drawTrend(); renderReports();
+    if (state.pending) renderPreview();
+  }
+
+  /* ---------- CSV ---------- */
+  function csvCell(v) { v = String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  function saveFile(filename, text) {
+    if (store.downloads) return store.downloads.save({ filename: filename, data: text });
+    try {
+      var url = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
+      var a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      return Promise.resolve();
+    } catch (e) { return Promise.reject(e); }
+  }
   function exportCsv() {
+    if (!state.anchor) return;
     var p = periodOf(state.mode, state.anchor);
     var rows = sortRows(aggregate(inPeriod()));
-    if (!rows.length) { toast('No data to export.'); return; }
-    var lines = [['Period', 'Contractor', 'Email', 'Comments Reviewed', 'Allowed (Error)', '% Allowed'].join(',')];
+    if (!rows.length) { toast('Nothing to export for this period.'); return; }
+    var lines = [['Period', 'Contractor', 'Email', 'Comments reviewed', 'Comments allowed', '% allowed'].join(',')];
     rows.forEach(function (r) {
-      lines.push([p.label, displayName(r.email), r.email, r.reviewed, r.allowed, r.pct == null ? '' : r.pct.toFixed(2)].join(','));
+      lines.push([p.label, displayName(r.email), r.email, r.reviewed, r.allowed, r.pct == null ? '' : r.pct.toFixed(2)].map(csvCell).join(','));
     });
-    var blob = new Blob([lines.join('\n')], { type: 'text/csv' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a'); a.href = url; a.download = 'contractor-review-' + state.mode + '.csv';
-    a.click(); URL.revokeObjectURL(url);
-    toast('CSV downloaded');
+    saveFile('contractor-review-' + state.mode + '-' + p.from + '.csv', lines.join('\n'))
+      .then(function () { toast('CSV saved'); })
+      .catch(function (e) { if (!e || e.code !== 'declined') toast('The CSV could not be saved here.'); });
   }
 
-  function renderAll() {
-    renderControls(); renderTable(); renderWho(); drawTrend(); renderReports();
-  }
-
+  /* ---------- wiring ---------- */
   document.querySelectorAll('.seg button').forEach(function (b) {
     b.addEventListener('click', function () { state.mode = b.getAttribute('data-mode'); renderAll(); });
   });
@@ -706,17 +952,34 @@ function findHeadlines(items) {
   $('latest').addEventListener('click', function () { var l = latestDate(); if (l) { state.anchor = l; renderAll(); } });
   $('csv').addEventListener('click', exportCsv);
   $('who').addEventListener('change', function () { state.who = this.value; drawTrend(); });
-  $('thr').addEventListener('input', function () { renderTable(); drawTrend(); });
+  $('thr').addEventListener('input', function () { lsSet(LS_THR, this.value); renderTable(); drawTrend(); });
+  var savedThr = lsGet(LS_THR); if (savedThr !== null && savedThr !== '') $('thr').value = savedThr;
 
   var drop = $('drop'), fileInput = $('file');
   $('pick').addEventListener('click', function () { fileInput.click(); });
   fileInput.addEventListener('change', function () { handleFile(fileInput.files[0]); fileInput.value = ''; });
-  drop.addEventListener('dragover', function (e) { e.preventDefault(); drop.classList.add('over'); });
-  drop.addEventListener('dragleave', function () { drop.classList.remove('over'); });
-  drop.addEventListener('drop', function (e) { e.preventDefault(); drop.classList.remove('over'); handleFile(e.dataTransfer && e.dataTransfer.files[0]); });
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); });
+  });
+  ['dragleave', 'drop'].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); });
+  });
+  drop.addEventListener('drop', function (e) { handleFile(e.dataTransfer && e.dataTransfer.files[0]); });
+  window.addEventListener('dragover', function (e) { e.preventDefault(); });
+  window.addEventListener('drop', function (e) { e.preventDefault(); });
 
-  loadLocal();
+  var lastW = 0;
+  if (window.ResizeObserver) {
+    new ResizeObserver(function (entries) {
+      var w = Math.round(entries[0].contentRect.width);
+      if (w && w !== lastW) { lastW = w; drawTrend(); }
+    }).observe($('trendBox'));
+  }
+
+  state.anchor = '';
+  renderAll();
+  initStorage();
 })();
 </script>
-</body>
-</html>
+
+</body></html>
