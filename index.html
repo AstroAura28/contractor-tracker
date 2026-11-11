@@ -92,10 +92,13 @@ button { cursor: pointer; }
 .btn[disabled] { opacity: .5; cursor: not-allowed; }
 .msg-err { color: var(--bad); width: 100%; }
 
+.notice { padding: 8px 12px; border-radius: 6px; background: var(--warn-soft); color: var(--warn); font-size: 13px; }
+.notices { display: flex; flex-direction: column; gap: 6px; }
 .pv-grid { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; margin-bottom: 12px; }
 .field { display: flex; flex-direction: column; gap: 4px; }
 .field.inline { flex-direction: row; align-items: center; gap: 8px; }
 .mt12 { margin-top: 12px; }
+.rowend { display: flex; gap: 6px; justify-content: flex-end; }
 .field label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 input[type="date"], input[type="number"], select { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; min-height: 34px; }
 input[type="number"] { width: 84px; }
@@ -145,8 +148,11 @@ svg.chart { display: block; width: 100%; }
 svg.chart text { font-family: var(--font-body); font-size: 11.5px; fill: var(--muted); }
 svg.chart text.val { fill: var(--fg); font-weight: 600; }
 svg.chart .grid { stroke: var(--line); stroke-width: 1; }
+svg.chart .thr { stroke: var(--bad); stroke-width: 1; stroke-dasharray: 4 4; }
+svg.chart text.thrl { fill: var(--bad); }
 svg.chart .ln { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
 svg.chart .dot { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
+svg.chart .dot.last { fill: var(--accent); }
 
 #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 6px; font-weight: 500; z-index: 20; }
 </style>
@@ -226,18 +232,19 @@ svg.chart .dot { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
 <script>
 var MONTHS = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
 function pad(n) { return String(n).padStart(2, '0'); }
+function to24(h, m, ap) { var x = Number(h) % 12; if (/pm/i.test(ap)) x += 12; return pad(x) + ':' + m; }
 function parseNum(s) { return Number(String(s).replace(/,/g, '')); }
+function validEmail(e) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); }
 function displayName(email) {
   var local = String(email).split('@')[0];
   return local.split(/[._-]+/).filter(Boolean).map(function (p) { return p.charAt(0).toUpperCase() + p.slice(1); }).join(' ') || email;
 }
 var TABLES = [
   ['reviewed', /review counts by contractor/i, 'Review counts by contractor'],
-  ['rejected', /comments rejected by the moderation system/i, 'Comments rejected by the Moderation system'],
+  ['removed', /caught and removed by contractors/i, 'Content caught and removed by contractors'],
   ['allowed', /content caught by moderation system and allowed by contractor/i, 'Content caught by moderation system and allowed by contractor']
 ];
 var ROW = /^(\S+@\S+)\s+([\d,]+)(?:\s+(\d+(?:\.\d+)?)\s*%)?$/;
-
 function parseReport(lines, fileName) {
   var warnings = [];
   var text = lines.join('\n');
@@ -247,13 +254,17 @@ function parseReport(lines, fileName) {
   if (hm && MONTHS[hm[1].toLowerCase()]) {
     var year = fm ? fm[1] : String(new Date().getFullYear());
     date = year + '-' + pad(MONTHS[hm[1].toLowerCase()]) + '-' + pad(hm[2]);
+    start = to24(hm[3], hm[4], hm[5]);
+    end = to24(hm[8], hm[9], hm[10]);
   } else if (fm) {
     date = fm[0];
   } else {
     date = new Date().toISOString().split('T')[0];
   }
+  var tzm = text.match(/\b([A-Z][A-Za-z]+\/[A-Z][A-Za-z_]+)\b/);
+  if (tzm) tz = tzm[1];
 
-  var sec = { reviewed: [], rejected: [], allowed: [] }, seen = {}, cur = null;
+  var sec = { reviewed: [], removed: [], allowed: [] }, seen = {}, cur = null;
   lines.forEach(function (line) {
     var l = line.trim(), hit = null;
     TABLES.forEach(function (t) { if (t[1].test(l)) hit = t[0]; });
@@ -266,12 +277,14 @@ function parseReport(lines, fileName) {
 
   var map = {}, order = [];
   function get(e) {
-    if (!map[e]) { map[e] = { email: e, reviewed: 0, rejected: 0, allowed: 0, base: 0 }; order.push(e); }
+    if (!map[e]) { map[e] = { email: e, reviewed: 0, removed: 0, allowed: 0, pct: null }; order.push(e); }
     return map[e];
   }
   sec.reviewed.forEach(function (r) { get(r.email).reviewed = r.n; });
-  sec.rejected.forEach(function (r) { get(r.email).rejected = r.n; });
-  sec.allowed.forEach(function (r) { var o = get(r.email); o.allowed = r.n; o.pct = r.pct; });
+  sec.removed.forEach(function (r) { get(r.email).removed = r.n; });
+  var inAllowed = {};
+  sec.allowed.forEach(function (r) { var o = get(r.email); o.allowed = r.n; o.pct = r.pct; inAllowed[r.email] = true; });
+  if (seen.allowed) order.forEach(function (e) { if (!inAllowed[e]) { map[e].allowed = 0; map[e].pct = 0; } });
 
   var rows = order.map(function (e) { return map[e]; }).sort(function (a, b) { return b.reviewed - a.reviewed; });
   return { date: date, start: start, end: end, tz: tz, rows: rows, warnings: warnings };
@@ -286,7 +299,7 @@ function parseReport(lines, fileName) {
   var LS_REPORTS = 'contractor-tracker:reports', LS_THR = 'contractor-tracker:threshold';
 
   var store = { reports: [] };
-  var state = { mode: 'day', anchor: '', sortKey: 'pct', sortDir: 'desc', who: 'team', pending: null };
+  var state = { mode: 'day', anchor: '', sortKey: 'pct', sortDir: 'desc', who: 'team', pending: null, confirmDel: '' };
 
   function h(tag, props, kids) {
     var e = document.createElement(tag);
@@ -314,6 +327,11 @@ function parseReport(lines, fileName) {
 
   function fmtInt(n) { return Number(n).toLocaleString('en-US'); }
   function fmtPct(p) { return p == null ? '–' : p.toFixed(2) + '%'; }
+  function fmtTime(t) {
+    if (!t) return '';
+    var p = t.split(':'), hh = Number(p[0]), ap = hh >= 12 ? 'pm' : 'am';
+    return ((hh % 12) || 12) + ':' + p[1] + ' ' + ap;
+  }
   function ymdToDate(s) { var p = s.split('-'); return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])); }
   function dateToYmd(d) { return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
   function addDays(s, n) { var d = ymdToDate(s); d.setUTCDate(d.getUTCDate() + n); return dateToYmd(d); }
@@ -347,9 +365,9 @@ function parseReport(lines, fileName) {
     reports.forEach(function (r) {
       r.rows.forEach(function (row) {
         var k = String(row.email).toLowerCase();
-        var a = map[k] || (map[k] = { email: k, reviewed: 0, rejected: 0, allowed: 0, base: 0 });
+        var a = map[k] || (map[k] = { email: k, reviewed: 0, removed: 0, allowed: 0, base: 0 });
         a.reviewed += row.reviewed || 0;
-        a.rejected += row.rejected || 0;
+        a.removed += row.removed || 0;
         a.allowed += row.allowed || 0;
         if (row.allowed > 0 && row.pct > 0) a.base += row.allowed * 100 / row.pct;
       });
@@ -361,8 +379,8 @@ function parseReport(lines, fileName) {
     });
   }
   function teamTotals(rows) {
-    var t = { reviewed: 0, rejected: 0, allowed: 0, base: 0 };
-    rows.forEach(function (r) { t.reviewed += r.reviewed; t.rejected += r.rejected; t.allowed += r.allowed; t.base += r.base; });
+    var t = { reviewed: 0, removed: 0, allowed: 0, base: 0 };
+    rows.forEach(function (r) { t.reviewed += r.reviewed; t.removed += r.removed; t.allowed += r.allowed; t.base += r.base; });
     t.pct = t.base > 0 ? t.allowed * 100 / t.base : 0;
     return t;
   }
@@ -373,7 +391,7 @@ function parseReport(lines, fileName) {
   }
 
   function sortReports() {
-    store.reports.sort(function (a, b) { return a.date.localeCompare(b.date); });
+    store.reports.sort(function (a, b) { return a.date === b.date ? String(a.start).localeCompare(String(b.start)) : a.date.localeCompare(b.date); });
   }
   function loadLocal() {
     try { store.reports = JSON.parse(lsGet(LS_REPORTS) || '[]'); } catch (e) { store.reports = []; }
@@ -382,7 +400,7 @@ function parseReport(lines, fileName) {
     renderAll();
   }
   function saveLocal() { lsSet(LS_REPORTS, JSON.stringify(store.reports)); }
-  function reportId(date) { return date; }
+  function reportId(date, start, end) { return date + '_' + (start ? start.replace(':', '') : 'x'); }
   function persistReport(rep) {
     store.reports = store.reports.filter(function (r) { return r.id !== rep.id; });
     store.reports.push(rep); sortReports(); saveLocal();
@@ -441,6 +459,7 @@ function parseReport(lines, fileName) {
       var parsed = parseReport(lines, file.name);
       state.pending = { parsed: parsed, fileName: file.name };
       renderPreview();
+      $('preview').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }).catch(function (e) {
       err.textContent = 'Could not read PDF file.'; err.hidden = false;
     });
@@ -455,7 +474,10 @@ function parseReport(lines, fileName) {
 
     saveBtn.addEventListener('click', function () {
       var date = dateInput.value; if (!date) return;
-      var rep = { id: reportId(date), date: date, source: p.fileName, rows: parsed.rows };
+      var rep = {
+        id: reportId(date, parsed.start, parsed.end), date: date, start: parsed.start, end: parsed.end,
+        source: p.fileName, rows: parsed.rows
+      };
       persistReport(rep).then(function () {
         state.pending = null; state.anchor = date;
         renderPreview(); renderAll();
@@ -487,11 +509,11 @@ function parseReport(lines, fileName) {
   function renderStats(rows, reps) {
     var t = teamTotals(rows), box = $('stats'); box.textContent = '';
     [
-      ['Comments Reviewed', rows.length ? fmtInt(t.reviewed) : '–'],
-      ['Comments Rejected', rows.length ? fmtInt(t.rejected) : '–'],
-      ['Comments Allowed (Error)', rows.length ? fmtInt(t.allowed) : '–'],
-      ['Team % Allowed', rows.length ? fmtPct(t.pct) : '–'],
-      ['Contractors', String(rows.length)]
+      ['Comments reviewed', rows.length ? fmtInt(t.reviewed) : '–'],
+      ['Comments allowed (Error)', rows.length ? fmtInt(t.allowed) : '–'],
+      ['Team % allowed', rows.length ? fmtPct(t.pct) : '–'],
+      ['Contractors', String(rows.length)],
+      ['Reports', String(reps.length)]
     ].forEach(function (it) {
       box.appendChild(h('div', { class: 'stat' }, [h('div', { class: 'k', text: it[0] }), h('div', { class: 'v', text: it[1] })]));
     });
@@ -524,7 +546,7 @@ function parseReport(lines, fileName) {
       if (state.sortKey === key) cell.setAttribute('aria-sort', state.sortDir === 'asc' ? 'ascending' : 'descending');
       return cell;
     }
-    var head = h('tr', null, [th('name', 'Contractor', false), th('reviewed', 'Comments Reviewed', true), th('rejected', 'Comments Rejected', true), th('allowed', 'Allowed (Error)', true), th('pct', '% Allowed', true), h('th', { text: 'Status' })]);
+    var head = h('tr', null, [th('name', 'Contractor', false), th('reviewed', 'Reviewed', true), th('removed', 'Removed', true), th('allowed', 'Allowed (Error)', true), th('pct', '% Allowed', true), h('th', { text: 'Status' })]);
     var body = h('tbody', null, sortRows(rows).map(function (r) {
       var over = thr > 0 && r.pct != null && r.pct > thr;
       var pill = r.pct == null || thr <= 0 ? h('span', { class: 'pill none', text: '–' })
@@ -534,7 +556,7 @@ function parseReport(lines, fileName) {
       return h('tr', null, [
         h('td', null, [h('div', { class: 'who', text: displayName(r.email) }), h('div', { class: 'em', text: r.email })]),
         h('td', { class: 'r num', text: fmtInt(r.reviewed) }),
-        h('td', { class: 'r num', text: fmtInt(r.rejected) }),
+        h('td', { class: 'r num', text: fmtInt(r.removed) }),
         h('td', { class: 'r num', text: fmtInt(r.allowed) }),
         h('td', { class: 'r' }, [h('div', { class: 'pctcell' }, [h('span', { class: 'bar' }, [fill]), h('span', { class: 'num', text: fmtPct(r.pct) })])]),
         h('td', null, [pill])
@@ -629,9 +651,9 @@ function parseReport(lines, fileName) {
     var p = periodOf(state.mode, state.anchor);
     var rows = sortRows(aggregate(inPeriod()));
     if (!rows.length) { toast('No data to export.'); return; }
-    var lines = [['Period', 'Contractor', 'Email', 'Comments Reviewed', 'Comments Rejected', 'Allowed (Error)', '% Allowed'].join(',')];
+    var lines = [['Period', 'Contractor', 'Email', 'Reviewed', 'Removed', 'Allowed (Error)', '% Allowed'].join(',')];
     rows.forEach(function (r) {
-      lines.push([p.label, displayName(r.email), r.email, r.reviewed, r.rejected, r.allowed, r.pct == null ? '' : r.pct.toFixed(2)].join(','));
+      lines.push([p.label, displayName(r.email), r.email, r.reviewed, r.removed, r.allowed, r.pct == null ? '' : r.pct.toFixed(2)].join(','));
     });
     var blob = new Blob([lines.join('\n')], { type: 'text/csv' });
     var url = URL.createObjectURL(blob);
