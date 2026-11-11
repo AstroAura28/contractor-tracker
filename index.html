@@ -217,6 +217,16 @@ svg.chart .dot.last { fill: var(--accent); }
       <button id="next" class="btn" type="button" aria-label="Next period">&#8250;</button>
       <button id="latest" class="btn" type="button">Latest</button>
     </div>
+    <div class="field inline">
+      <label for="shiftFilter">Shift Interval</label>
+      <select id="shiftFilter">
+        <option value="all">All shifts</option>
+        <option value="03:00-08:00">3:00 AM - 8:00 AM Manila (06:00 - 11:00 AU)</option>
+        <option value="08:00-13:00">8:00 AM - 1:00 PM Manila (11:00 - 16:00 AU)</option>
+        <option value="13:00-18:00">1:00 PM - 6:00 PM Manila (16:00 - 21:00 AU)</option>
+        <option value="18:00-00:00">6:00 PM - 12:00 AM Manila (22:00 - 03:00 AU)</option>
+      </select>
+    </div>
     <span class="spacer"></span>
     <div class="thr">
       <label for="thr">Flag above (% allowed)</label>
@@ -379,7 +389,7 @@ function findHeadlines(items) {
   var LS_REPORTS = 'contractor-tracker:reports', LS_THR = 'contractor-tracker:threshold';
 
   var store = { mode: 'loading', db: null, reports: [], downloads: null };
-  var state = { mode: 'day', anchor: '', sortKey: 'pct', sortDir: 'desc', who: 'team', pendingQueue: [], confirmDel: '' };
+  var state = { mode: 'day', anchor: '', shiftFilter: 'all', sortKey: 'pct', sortDir: 'desc', who: 'team', pendingQueue: [], confirmDel: '' };
 
   function h(tag, props, kids) {
     var e = document.createElement(tag);
@@ -446,6 +456,23 @@ function findHeadlines(items) {
   }
   function getThreshold() { var v = parseFloat($('thr').value); return isNaN(v) ? 0 : v; }
 
+  // Check if report start time matches selected Manila shift interval
+  function matchesShift(r, filterVal) {
+    if (filterVal === 'all') return true;
+    if (!r.start) return true; // if no start time recorded, don't filter out
+    var startH = parseInt(r.start.split(':')[0], 10);
+    // Convert AU start time to Manila time (+3 hours ahead in AU relative to Manila? Wait, Sydney is UTC+11 in Nov (AEDT), Manila is UTC+8. So Sydney is 3 hours ahead of Manila.)
+    // Let's verify: Sydney 21:00 (9pm) = Manila 18:00 (6pm). Correct! Sydney is +3 hours ahead of Manila.
+    // So Manila time = Sydney time - 3 hours.
+    var manilaH = (startH - 3 + 24) % 24;
+    
+    if (filterVal === '03:00-08:00') return manilaH >= 3 && manilaH < 8;
+    if (filterVal === '08:00-13:00') return manilaH >= 8 && manilaH < 13;
+    if (filterVal === '13:00-18:00') return manilaH >= 13 && manilaH < 18;
+    if (filterVal === '18:00-00:00') return manilaH >= 18 || manilaH < 3;
+    return true;
+  }
+
   function aggregate(reports) {
     var map = {};
     reports.forEach(function (r) {
@@ -486,7 +513,9 @@ function findHeadlines(items) {
   function inPeriod() {
     if (!state.anchor) return [];
     var p = periodOf(state.mode, state.anchor);
-    return store.reports.filter(function (r) { return r.date >= p.from && r.date <= p.to; });
+    return store.reports.filter(function (r) { 
+      return r.date >= p.from && r.date <= p.to && matchesShift(r, state.shiftFilter); 
+    });
   }
 
   function validDoc(d) { return d && typeof d.date === 'string' && Array.isArray(d.rows); }
@@ -777,7 +806,7 @@ function findHeadlines(items) {
     if (!rows.length) {
       var lat = latestDate();
       box.appendChild(h('div', { class: 'empty' }, [
-        h('p', { text: 'No reports saved for ' + periodOf(state.mode, state.anchor).label + '.' }),
+        h('p', { text: 'No reports saved for ' + periodOf(state.mode, state.anchor).label + ' matching this shift filter.' }),
         h('button', { class: 'btn', type: 'button', text: 'Go to latest report (' + md(lat) + ')', onclick: function () { state.anchor = lat; renderAll(); } })
       ]));
       return;
@@ -825,6 +854,7 @@ function findHeadlines(items) {
     $('prev').disabled = !state.anchor || all;
     $('next').disabled = !state.anchor || all;
     $('latest').disabled = !state.anchor || all;
+    $('shiftFilter').value = state.shiftFilter;
   }
 
   function renderWho() {
@@ -845,7 +875,11 @@ function findHeadlines(items) {
 
   function trendSeries(who) {
     var byDate = {};
-    store.reports.forEach(function (r) { (byDate[r.date] = byDate[r.date] || []).push(r); });
+    store.reports.forEach(function (r) { 
+      if (matchesShift(r, state.shiftFilter)) {
+        (byDate[r.date] = byDate[r.date] || []).push(r); 
+      }
+    });
     var out = [];
     Object.keys(byDate).sort().slice(-30).forEach(function (d) {
       if (who === 'team') {
@@ -873,7 +907,7 @@ function findHeadlines(items) {
   function drawTrend() {
     var box = $('trendBox'); box.textContent = '';
     var pts = trendSeries(state.who);
-    if (!pts.length) { box.appendChild(h('div', { class: 'empty', text: 'The trend appears once a report is saved.' })); return; }
+    if (!pts.length) { box.appendChild(h('div', { class: 'empty', text: 'The trend appears once a report matching this shift filter is saved.' })); return; }
     var w = Math.max(280, box.clientWidth || 600), ht = 230, m = { l: 44, r: 20, t: 24, b: 30 };
     var thr = getThreshold();
     var top = niceCeil(Math.max.apply(null, pts.map(function (p) { return p.pct; }).concat([thr, 5])) * 1.1);
@@ -976,6 +1010,7 @@ function findHeadlines(items) {
   $('prev').addEventListener('click', function () { state.anchor = shift(state.mode, state.anchor, -1); renderAll(); });
   $('next').addEventListener('click', function () { state.anchor = shift(state.mode, state.anchor, 1); renderAll(); });
   $('latest').addEventListener('click', function () { var l = latestDate(); if (l) { state.anchor = l; renderAll(); } });
+  $('shiftFilter').addEventListener('change', function () { state.shiftFilter = this.value; renderAll(); });
   $('csv').addEventListener('click', exportCsv);
   $('who').addEventListener('change', function () { state.who = this.value; drawTrend(); });
   $('thr').addEventListener('input', function () { lsSet(LS_THR, this.value); renderTable(); drawTrend(); });
