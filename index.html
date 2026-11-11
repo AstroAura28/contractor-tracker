@@ -53,4 +53,616 @@ body {
   color: var(--fg);
   font-family: var(--font-body);
   font-size: 14px;
-  line-height: 1.
+  line-height: 1.5;
+  padding: 20px 16px 48px;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+.wrap { display: flex; flex-direction: column; gap: 16px; }
+h1, h2 { font-family: var(--font-head); margin: 0; }
+h1 { font-size: 26px; line-height: 1.2; font-weight: 700; }
+h2 { font-size: 17px; font-weight: 700; }
+p { margin: 0; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.num { font-variant-numeric: tabular-nums; }
+
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 16px; }
+.top .sub { color: var(--muted); margin-top: 2px; }
+.status { font-size: 12.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+.status.local::before { background: var(--warn); }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.panel-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.panel-body { padding: 16px; min-width: 0; }
+
+.drop { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 14px 16px; border: 1.5px dashed var(--line); border-radius: 8px; background: var(--surface); transition: border-color .15s, background .15s; }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop .txt { flex: 1 1 240px; min-width: 0; }
+.drop .txt strong { display: block; font-weight: 600; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 7px 13px; font-weight: 500; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { color: var(--bad); border-color: var(--bad); }
+.btn[disabled] { opacity: .5; cursor: not-allowed; }
+.msg-err { color: var(--bad); width: 100%; }
+
+.pv-grid { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; margin-bottom: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field.inline { flex-direction: row; align-items: center; gap: 8px; }
+.mt12 { margin-top: 12px; }
+.field label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+input[type="date"], input[type="number"], select { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; min-height: 34px; }
+input[type="number"] { width: 84px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: transparent; padding: 7px 16px; font-weight: 500; border-right: 1px solid var(--line); }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+.nav { display: inline-flex; align-items: center; gap: 6px; }
+.nav .lbl { min-width: 160px; text-align: center; font-weight: 600; font-family: var(--font-head); }
+.nav .btn { padding: 6px 11px; }
+.spacer { flex: 1 1 0; }
+.thr { display: inline-flex; align-items: center; gap: 8px; }
+.thr label { color: var(--muted); font-size: 13px; }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.stat { padding: 14px 16px; border-right: 1px solid var(--line); min-width: 0; }
+.stat:last-child { border-right: 0; }
+.stat .k { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.stat .v { font-family: var(--font-head); font-size: 26px; font-weight: 700; line-height: 1.2; }
+
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 700px; }
+th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: 0; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; white-space: nowrap; }
+th.r, td.r { text-align: right; }
+th button { background: none; border: 0; padding: 0; font-weight: inherit; color: inherit; display: inline-flex; gap: 5px; align-items: center; }
+th[aria-sort="ascending"] button::after { content: " ↑"; }
+th[aria-sort="descending"] button::after { content: " ↓"; }
+td .who { font-weight: 600; }
+td .em { color: var(--muted); font-size: 12.5px; }
+.pctcell { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+.bar { width: 90px; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; flex: none; }
+.bar i { display: block; height: 100%; background: var(--accent); }
+.bar i.hi { background: var(--bad); }
+.pill { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+.pill.good { background: var(--good-soft); color: var(--good); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.pill.none { background: var(--surface-2); color: var(--muted); }
+.empty { padding: 28px 16px; text-align: center; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.foot { padding: 10px 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; }
+
+svg.chart { display: block; width: 100%; }
+svg.chart text { font-family: var(--font-body); font-size: 11.5px; fill: var(--muted); }
+svg.chart text.val { fill: var(--fg); font-weight: 600; }
+svg.chart .grid { stroke: var(--line); stroke-width: 1; }
+svg.chart .ln { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
+svg.chart .dot { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
+
+#toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 6px; font-weight: 500; z-index: 20; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Contractor Review Tracker</h1>
+      <p class="sub">Moderation human review tracker built from client PDF reports</p>
+    </div>
+    <span id="status" class="status local">Saved in this browser (Local)</span>
+  </header>
+
+  <section id="drop" class="drop">
+    <div class="txt">
+      <strong>Drop the client's PDF report here</strong>
+      <span class="muted small">Parsed securely in your browser. Contractors are matched by email.</span>
+    </div>
+    <button id="pick" class="btn primary" type="button">Choose PDF</button>
+    <input id="file" type="file" accept="application/pdf,.pdf" hidden>
+    <p id="dropErr" class="msg-err" role="alert" hidden></p>
+  </section>
+
+  <section id="preview" class="panel" hidden></section>
+
+  <section class="controls">
+    <div class="seg" role="group">
+      <button type="button" data-mode="day" aria-pressed="false">Daily</button>
+      <button type="button" data-mode="week" aria-pressed="false">Weekly</button>
+      <button type="button" data-mode="month" aria-pressed="false">Monthly</button>
+    </div>
+    <div class="nav">
+      <button id="prev" class="btn" type="button">&#8249;</button>
+      <span id="plabel" class="lbl"></span>
+      <button id="next" class="btn" type="button">&#8250;</button>
+      <button id="latest" class="btn" type="button">Latest</button>
+    </div>
+    <span class="spacer"></span>
+    <div class="thr">
+      <label for="thr">Flag above (% allowed)</label>
+      <input id="thr" type="number" min="0" max="100" step="1" value="15">
+    </div>
+    <button id="csv" class="btn" type="button">Export CSV</button>
+  </section>
+
+  <section class="panel">
+    <div id="stats" class="stats"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Contractors</h2><span id="tcount" class="muted small"></span></div>
+    <div id="tableBox"></div>
+    <p class="foot">Error % reflects content caught by the moderation system and allowed by the contractor.</p>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>% allowed trend</h2>
+      <div class="field inline">
+        <label for="who">Show</label>
+        <select id="who"></select>
+      </div>
+    </div>
+    <div class="panel-body"><div id="trendBox"></div></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Saved reports</h2><span id="rcount" class="muted small"></span></div>
+    <div id="reportsBox" class="scroll"></div>
+  </section>
+</div>
+<div id="toast" role="status" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+var MONTHS = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+function pad(n) { return String(n).padStart(2, '0'); }
+function parseNum(s) { return Number(String(s).replace(/,/g, '')); }
+function displayName(email) {
+  var local = String(email).split('@')[0];
+  return local.split(/[._-]+/).filter(Boolean).map(function (p) { return p.charAt(0).toUpperCase() + p.slice(1); }).join(' ') || email;
+}
+var TABLES = [
+  ['reviewed', /review counts by contractor/i, 'Review counts by contractor'],
+  ['rejected', /comments rejected by the moderation system/i, 'Comments rejected by the Moderation system'],
+  ['allowed', /content caught by moderation system and allowed by contractor/i, 'Content caught by moderation system and allowed by contractor']
+];
+var ROW = /^(\S+@\S+)\s+([\d,]+)(?:\s+(\d+(?:\.\d+)?)\s*%)?$/;
+
+function parseReport(lines, fileName) {
+  var warnings = [];
+  var text = lines.join('\n');
+  var date = '', start = '', end = '', tz = '';
+  var hm = text.match(/([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{1,2}):(\d{2})\s*([AaPp][Mm])\s*[–—-]\s*([A-Z][a-z]{2})\s+(\d{1,2}),\s*(\d{1,2}):(\d{2})\s*([AaPp][Mm])/);
+  var fm = String(fileName || '').match(/(20\d{2})-(\d{2})-(\d{2})/);
+  if (hm && MONTHS[hm[1].toLowerCase()]) {
+    var year = fm ? fm[1] : String(new Date().getFullYear());
+    date = year + '-' + pad(MONTHS[hm[1].toLowerCase()]) + '-' + pad(hm[2]);
+  } else if (fm) {
+    date = fm[0];
+  } else {
+    date = new Date().toISOString().split('T')[0];
+  }
+
+  var sec = { reviewed: [], rejected: [], allowed: [] }, seen = {}, cur = null;
+  lines.forEach(function (line) {
+    var l = line.trim(), hit = null;
+    TABLES.forEach(function (t) { if (t[1].test(l)) hit = t[0]; });
+    if (hit) { cur = hit; seen[hit] = true; return; }
+    if (!cur) return;
+    var m = l.match(ROW);
+    if (!m) return;
+    sec[cur].push({ email: m[1].toLowerCase(), n: parseNum(m[2]), pct: m[3] != null ? parseFloat(m[3]) : null });
+  });
+
+  var map = {}, order = [];
+  function get(e) {
+    if (!map[e]) { map[e] = { email: e, reviewed: 0, rejected: 0, allowed: 0, base: 0 }; order.push(e); }
+    return map[e];
+  }
+  sec.reviewed.forEach(function (r) { get(r.email).reviewed = r.n; });
+  sec.rejected.forEach(function (r) { get(r.email).rejected = r.n; });
+  sec.allowed.forEach(function (r) { var o = get(r.email); o.allowed = r.n; o.pct = r.pct; });
+
+  var rows = order.map(function (e) { return map[e]; }).sort(function (a, b) { return b.reviewed - a.reviewed; });
+  return { date: date, start: start, end: end, tz: tz, rows: rows, warnings: warnings };
+}
+
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var MONFULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  var LS_REPORTS = 'contractor-tracker:reports', LS_THR = 'contractor-tracker:threshold';
+
+  var store = { reports: [] };
+  var state = { mode: 'day', anchor: '', sortKey: 'pct', sortDir: 'desc', who: 'team', pending: null };
+
+  function h(tag, props, kids) {
+    var e = document.createElement(tag);
+    if (props) Object.keys(props).forEach(function (k) {
+      var v = props[k];
+      if (k === 'class') e.className = v;
+      else if (k === 'text') e.textContent = v;
+      else if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), v);
+      else if (v === true) e.setAttribute(k, '');
+      else if (v !== false && v != null) e.setAttribute(k, v);
+    });
+    (kids || []).forEach(function (c) {
+      if (c == null) return;
+      e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+    });
+    return e;
+  }
+  function toast(msg) {
+    var t = $('toast'); t.textContent = msg; t.hidden = false;
+    clearTimeout(toast.t);
+    toast.t = setTimeout(function () { t.hidden = true; }, 3200);
+  }
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+  function fmtInt(n) { return Number(n).toLocaleString('en-US'); }
+  function fmtPct(p) { return p == null ? '–' : p.toFixed(2) + '%'; }
+  function ymdToDate(s) { var p = s.split('-'); return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])); }
+  function dateToYmd(d) { return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
+  function addDays(s, n) { var d = ymdToDate(s); d.setUTCDate(d.getUTCDate() + n); return dateToYmd(d); }
+  function md(s) { var d = ymdToDate(s); return MON[d.getUTCMonth()] + ' ' + d.getUTCDate(); }
+  function longDate(s) { var d = ymdToDate(s); return DOW[d.getUTCDay()] + ', ' + md(s) + ', ' + d.getUTCFullYear(); }
+  
+  function periodOf(mode, anchor) {
+    var d = ymdToDate(anchor);
+    if (mode === 'day') return { from: anchor, to: anchor, label: longDate(anchor) };
+    if (mode === 'week') {
+      var from = addDays(anchor, -((d.getUTCDay() + 6) % 7)), to = addDays(from, 6);
+      return { from: from, to: to, label: md(from) + ' – ' + md(to) };
+    }
+    var y = d.getUTCFullYear(), m = d.getUTCMonth();
+    return { from: y + '-' + pad(m + 1) + '-01', to: dateToYmd(new Date(Date.UTC(y, m + 1, 0))), label: MONFULL[m] + ' ' + y };
+  }
+  function shift(mode, anchor, dir) {
+    if (mode === 'day') return addDays(anchor, dir);
+    if (mode === 'week') return addDays(anchor, 7 * dir);
+    var d = ymdToDate(anchor); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + dir);
+    return dateToYmd(d);
+  }
+  function latestDate() {
+    var d = ''; store.reports.forEach(function (r) { if (r.date > d) d = r.date; });
+    return d;
+  }
+  function getThreshold() { var v = parseFloat($('thr').value); return isNaN(v) ? 0 : v; }
+
+  function aggregate(reports) {
+    var map = {};
+    reports.forEach(function (r) {
+      r.rows.forEach(function (row) {
+        var k = String(row.email).toLowerCase();
+        var a = map[k] || (map[k] = { email: k, reviewed: 0, rejected: 0, allowed: 0, base: 0 });
+        a.reviewed += row.reviewed || 0;
+        a.rejected += row.rejected || 0;
+        a.allowed += row.allowed || 0;
+        if (row.allowed > 0 && row.pct > 0) a.base += row.allowed * 100 / row.pct;
+      });
+    });
+    return Object.keys(map).map(function (k) {
+      var a = map[k];
+      a.pct = a.base > 0 ? a.allowed * 100 / a.base : (a.allowed === 0 ? 0 : null);
+      return a;
+    });
+  }
+  function teamTotals(rows) {
+    var t = { reviewed: 0, rejected: 0, allowed: 0, base: 0 };
+    rows.forEach(function (r) { t.reviewed += r.reviewed; t.rejected += r.rejected; t.allowed += r.allowed; t.base += r.base; });
+    t.pct = t.base > 0 ? t.allowed * 100 / t.base : 0;
+    return t;
+  }
+  function inPeriod() {
+    if (!state.anchor) return [];
+    var p = periodOf(state.mode, state.anchor);
+    return store.reports.filter(function (r) { return r.date >= p.from && r.date <= p.to; });
+  }
+
+  function sortReports() {
+    store.reports.sort(function (a, b) { return a.date.localeCompare(b.date); });
+  }
+  function loadLocal() {
+    try { store.reports = JSON.parse(lsGet(LS_REPORTS) || '[]'); } catch (e) { store.reports = []; }
+    sortReports();
+    if (!state.anchor && store.reports.length) state.anchor = latestDate();
+    renderAll();
+  }
+  function saveLocal() { lsSet(LS_REPORTS, JSON.stringify(store.reports)); }
+  function reportId(date) { return date; }
+  function persistReport(rep) {
+    store.reports = store.reports.filter(function (r) { return r.id !== rep.id; });
+    store.reports.push(rep); sortReports(); saveLocal();
+    return Promise.resolve();
+  }
+  function removeReport(id) {
+    store.reports = store.reports.filter(function (r) { return r.id !== id; });
+    saveLocal();
+    return Promise.resolve();
+  }
+
+  function extractLines(file) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    return file.arrayBuffer().then(function (buf) {
+      return pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+    }).then(function (pdf) {
+      var all = [], chain = Promise.resolve();
+      for (var i = 1; i <= pdf.numPages; i++) {
+        (function (n) {
+          chain = chain.then(function () { return pdf.getPage(n); }).then(function (page) { return page.getTextContent(); }).then(function (tc) {
+            var items = tc.items.filter(function (it) { return it.str && it.str.trim(); }).map(function (it) {
+              return { s: it.str, x: it.transform[4], y: it.transform[5], w: it.width || 0 };
+            });
+            items.sort(function (a, b) { return Math.abs(b.y - a.y) > 3 ? b.y - a.y : a.x - b.x; });
+            var cur = null, curY = null;
+            items.forEach(function (it) {
+              if (cur === null || Math.abs(it.y - curY) > 3) {
+                if (cur) all.push(cur.parts);
+                cur = { parts: [] }; curY = it.y;
+              }
+              cur.parts.push(it);
+            });
+            if (cur) all.push(cur.parts);
+          });
+        })(i);
+      }
+      return chain.then(function () {
+        return all.map(function (parts) {
+          parts.sort(function (a, b) { return a.x - b.x; });
+          var out = '', prevEnd = null;
+          parts.forEach(function (p) {
+            if (prevEnd !== null) out += (p.x - prevEnd < 1.5) ? '' : ' ';
+            out += p.s.trim();
+            prevEnd = p.x + p.w;
+          });
+          return out;
+        });
+      });
+    });
+  }
+
+  function handleFile(file) {
+    var err = $('dropErr'); err.hidden = true;
+    if (!file) return;
+    extractLines(file).then(function (lines) {
+      var parsed = parseReport(lines, file.name);
+      state.pending = { parsed: parsed, fileName: file.name };
+      renderPreview();
+    }).catch(function (e) {
+      err.textContent = 'Could not read PDF file.'; err.hidden = false;
+    });
+  }
+
+  function renderPreview() {
+    var box = $('preview'); var p = state.pending;
+    if (!p) { box.hidden = true; box.textContent = ''; return; }
+    var parsed = p.parsed; box.hidden = false; box.textContent = '';
+    var dateInput = h('input', { id: 'pvDate', type: 'date', value: parsed.date || '' });
+    var saveBtn = h('button', { class: 'btn primary', type: 'button', text: 'Save report' });
+
+    saveBtn.addEventListener('click', function () {
+      var date = dateInput.value; if (!date) return;
+      var rep = { id: reportId(date), date: date, source: p.fileName, rows: parsed.rows };
+      persistReport(rep).then(function () {
+        state.pending = null; state.anchor = date;
+        renderPreview(); renderAll();
+        toast('Report saved successfully');
+      });
+    });
+
+    box.appendChild(h('div', { class: 'panel-head' }, [h('h2', { text: 'Confirm Report' }), h('span', { class: 'muted small', text: p.fileName })]));
+    var body = h('div', { class: 'panel-body' }, [
+      h('div', { class: 'pv-grid' }, [h('div', { class: 'field' }, [h('label', { for: 'pvDate', text: 'Report Date' }), dateInput])]),
+      h('div', { class: 'actions' }, [saveBtn, h('button', { class: 'btn', type: 'button', text: 'Cancel', onclick: function () { state.pending = null; renderPreview(); } })])
+    ]);
+    box.appendChild(body);
+  }
+
+  function sortRows(rows) {
+    var k = state.sortKey, dir = state.sortDir === 'asc' ? 1 : -1;
+    return rows.slice().sort(function (a, b) {
+      var av, bv;
+      if (k === 'name') { av = displayName(a.email).toLowerCase(); bv = displayName(b.email).toLowerCase(); return av < bv ? -dir : av > bv ? dir : 0; }
+      av = a[k]; bv = b[k];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return (av - bv) * dir;
+    });
+  }
+
+  function renderStats(rows, reps) {
+    var t = teamTotals(rows), box = $('stats'); box.textContent = '';
+    [
+      ['Comments Reviewed', rows.length ? fmtInt(t.reviewed) : '–'],
+      ['Comments Rejected', rows.length ? fmtInt(t.rejected) : '–'],
+      ['Comments Allowed (Error)', rows.length ? fmtInt(t.allowed) : '–'],
+      ['Team % Allowed', rows.length ? fmtPct(t.pct) : '–'],
+      ['Contractors', String(rows.length)]
+    ].forEach(function (it) {
+      box.appendChild(h('div', { class: 'stat' }, [h('div', { class: 'k', text: it[0] }), h('div', { class: 'v', text: it[1] })]));
+    });
+  }
+
+  function renderTable() {
+    var box = $('tableBox'); box.textContent = '';
+    var reps = inPeriod(); var rows = aggregate(reps);
+    renderStats(rows, reps);
+    $('tcount').textContent = rows.length ? rows.length + ' contractors' : '';
+
+    if (!store.reports.length) {
+      box.appendChild(h('div', { class: 'empty' }, [h('p', { text: 'No reports saved yet. Drop your client PDF above to begin.' })]));
+      return;
+    }
+    if (!rows.length) {
+      box.appendChild(h('div', { class: 'empty' }, [h('p', { text: 'No reports found for this timeframe.' })]));
+      return;
+    }
+
+    var thr = getThreshold();
+    var maxPct = Math.max.apply(null, rows.map(function (r) { return r.pct || 0; }).concat([1]));
+    function th(key, label, right) {
+      var b = h('button', { type: 'button', text: label, onclick: function () {
+        if (state.sortKey === key) state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+        else { state.sortKey = key; state.sortDir = key === 'name' ? 'asc' : 'desc'; }
+        renderTable();
+      } });
+      var cell = h('th', { class: right ? 'r' : '', scope: 'col' }, [b]);
+      if (state.sortKey === key) cell.setAttribute('aria-sort', state.sortDir === 'asc' ? 'ascending' : 'descending');
+      return cell;
+    }
+    var head = h('tr', null, [th('name', 'Contractor', false), th('reviewed', 'Comments Reviewed', true), th('rejected', 'Comments Rejected', true), th('allowed', 'Allowed (Error)', true), th('pct', '% Allowed', true), h('th', { text: 'Status' })]);
+    var body = h('tbody', null, sortRows(rows).map(function (r) {
+      var over = thr > 0 && r.pct != null && r.pct > thr;
+      var pill = r.pct == null || thr <= 0 ? h('span', { class: 'pill none', text: '–' })
+        : over ? h('span', { class: 'pill bad', text: 'Above Target' }) : h('span', { class: 'pill good', text: 'Normal' });
+      var fill = h('i', { class: over ? 'hi' : '' });
+      fill.style.width = Math.max(0, Math.min(100, (r.pct || 0) / maxPct * 100)) + '%';
+      return h('tr', null, [
+        h('td', null, [h('div', { class: 'who', text: displayName(r.email) }), h('div', { class: 'em', text: r.email })]),
+        h('td', { class: 'r num', text: fmtInt(r.reviewed) }),
+        h('td', { class: 'r num', text: fmtInt(r.rejected) }),
+        h('td', { class: 'r num', text: fmtInt(r.allowed) }),
+        h('td', { class: 'r' }, [h('div', { class: 'pctcell' }, [h('span', { class: 'bar' }, [fill]), h('span', { class: 'num', text: fmtPct(r.pct) })])]),
+        h('td', null, [pill])
+      ]);
+    }));
+    box.appendChild(h('div', { class: 'scroll' }, [h('table', null, [h('thead', null, [head]), body])]));
+  }
+
+  function renderControls() {
+    document.querySelectorAll('.seg button').forEach(function (b) {
+      b.setAttribute('aria-pressed', b.getAttribute('data-mode') === state.mode ? 'true' : 'false');
+    });
+    $('plabel').textContent = state.anchor ? periodOf(state.mode, state.anchor).label : 'No reports';
+  }
+
+  function renderWho() {
+    var emails = {};
+    store.reports.forEach(function (r) { r.rows.forEach(function (x) { emails[String(x.email).toLowerCase()] = true; }); });
+    var list = Object.keys(emails).sort();
+    var sel = $('who'); sel.textContent = '';
+    sel.appendChild(h('option', { value: 'team', text: 'Whole team' }));
+    list.forEach(function (e) { sel.appendChild(h('option', { value: e, text: displayName(e) })); });
+    sel.value = state.who;
+  }
+
+  function trendSeries(who) {
+    var byDate = {};
+    store.reports.forEach(function (r) { (byDate[r.date] = byDate[r.date] || []).push(r); });
+    var out = [];
+    Object.keys(byDate).sort().forEach(function (d) {
+      var rows = aggregate(byDate[d]);
+      if (who !== 'team') rows = rows.filter(function (x) { return x.email === who; });
+      if (!rows.length) return;
+      var t = teamTotals(rows);
+      out.push({ date: d, pct: t.pct, allowed: t.allowed, reviewed: t.reviewed });
+    });
+    return out;
+  }
+  function svg(tag, attrs, text) {
+    var e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function drawTrend() {
+    var box = $('trendBox'); box.textContent = '';
+    var pts = trendSeries(state.who);
+    if (!pts.length) { box.appendChild(h('div', { class: 'empty', text: 'Trend chart appears after reports are saved.' })); return; }
+    var w = Math.max(280, box.clientWidth || 600), ht = 230, m = { l: 44, r: 20, t: 24, b: 30 };
+    var top = Math.max.apply(null, pts.map(function (p) { return p.pct; }).concat([15])) * 1.2;
+    var ph = ht - m.t - m.b;
+    function Y(v) { return m.t + (1 - v / top) * ph; }
+    function X(i) { return pts.length === 1 ? w / 2 : m.l + i * (w - m.l - m.r) / (pts.length - 1); }
+    var s = svg('svg', { class: 'chart', width: w, height: ht, viewBox: '0 0 ' + w + ' ' + ht });
+    [0, top / 2, top].forEach(function (v) {
+      s.appendChild(svg('line', { class: 'grid', x1: m.l, x2: w - m.r, y1: Y(v), y2: Y(v) }));
+      s.appendChild(svg('text', { x: m.l - 8, y: Y(v) + 4, 'text-anchor': 'end' }, Math.round(v) + '%'));
+    });
+    if (pts.length > 1) {
+      s.appendChild(svg('path', { class: 'ln', d: pts.map(function (p, i) { return (i ? 'L' : 'M') + X(i) + ' ' + Y(p.pct); }).join(' ') }));
+    }
+    pts.forEach(function (p, i) {
+      var dot = svg('circle', { class: 'dot', cx: X(i), cy: Y(p.pct), r: 4.5 });
+      s.appendChild(dot);
+      s.appendChild(svg('text', { class: 'val', x: X(i), y: Y(p.pct) - 11, 'text-anchor': 'middle' }, p.pct.toFixed(1) + '%'));
+      s.appendChild(svg('text', { x: X(i), y: ht - 9, 'text-anchor': 'middle' }, md(p.date)));
+    });
+    box.appendChild(s);
+  }
+
+  function renderReports() {
+    var box = $('reportsBox'); box.textContent = '';
+    $('rcount').textContent = store.reports.length ? store.reports.length + ' saved' : '';
+    if (!store.reports.length) { box.appendChild(h('div', { class: 'empty', text: 'No reports saved.' })); return; }
+    var list = store.reports.slice().reverse();
+    var head = h('tr', null, ['Date', 'Contractors', 'Reviewed', 'File', ''].map(function (t, i) { return h('th', { class: i === 1 || i === 2 ? 'r' : '', text: t }); }));
+    var body = h('tbody', null, list.map(function (r) {
+      return h('tr', null, [
+        h('td', { class: 'num', text: longDate(r.date) }),
+        h('td', { class: 'r num', text: String(r.rows.length) }),
+        h('td', { class: 'r num', text: fmtInt(r.rows.reduce(function(a, b){return a + b.reviewed}, 0)) }),
+        h('td', { class: 'em muted', text: r.source || '' }),
+        h('td', null, [h('button', { class: 'btn danger', type: 'button', text: 'Remove', onclick: function () {
+          removeReport(r.id).then(function () { renderAll(); toast('Report removed'); });
+        } })])
+      ]);
+    }));
+    box.appendChild(h('table', null, [h('thead', null, [head]), body]));
+  }
+
+  function exportCsv() {
+    var p = periodOf(state.mode, state.anchor);
+    var rows = sortRows(aggregate(inPeriod()));
+    if (!rows.length) { toast('No data to export.'); return; }
+    var lines = [['Period', 'Contractor', 'Email', 'Comments Reviewed', 'Comments Rejected', 'Allowed (Error)', '% Allowed'].join(',')];
+    rows.forEach(function (r) {
+      lines.push([p.label, displayName(r.email), r.email, r.reviewed, r.rejected, r.allowed, r.pct == null ? '' : r.pct.toFixed(2)].join(','));
+    });
+    var blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a'); a.href = url; a.download = 'contractor-review-' + state.mode + '.csv';
+    a.click(); URL.revokeObjectURL(url);
+    toast('CSV downloaded');
+  }
+
+  function renderAll() {
+    renderControls(); renderTable(); renderWho(); drawTrend(); renderReports();
+  }
+
+  document.querySelectorAll('.seg button').forEach(function (b) {
+    b.addEventListener('click', function () { state.mode = b.getAttribute('data-mode'); renderAll(); });
+  });
+  $('prev').addEventListener('click', function () { state.anchor = shift(state.mode, state.anchor, -1); renderAll(); });
+  $('next').addEventListener('click', function () { state.anchor = shift(state.mode, state.anchor, 1); renderAll(); });
+  $('latest').addEventListener('click', function () { var l = latestDate(); if (l) { state.anchor = l; renderAll(); } });
+  $('csv').addEventListener('click', exportCsv);
+  $('who').addEventListener('change', function () { state.who = this.value; drawTrend(); });
+  $('thr').addEventListener('input', function () { renderTable(); drawTrend(); });
+
+  var drop = $('drop'), fileInput = $('file');
+  $('pick').addEventListener('click', function () { fileInput.click(); });
+  fileInput.addEventListener('change', function () { handleFile(fileInput.files[0]); fileInput.value = ''; });
+  drop.addEventListener('dragover', function (e) { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', function () { drop.classList.remove('over'); });
+  drop.addEventListener('drop', function (e) { e.preventDefault(); drop.classList.remove('over'); handleFile(e.dataTransfer && e.dataTransfer.files[0]); });
+
+  loadLocal();
+})();
+</script>
+</body>
+</html>
