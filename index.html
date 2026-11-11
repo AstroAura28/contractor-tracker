@@ -194,11 +194,11 @@ svg.chart .dot.last { fill: var(--accent); }
 
   <section id="drop" class="drop" aria-label="Add a report">
     <div class="txt">
-      <strong>Drop the client's PDF report here</strong>
+      <strong>Drop the client's PDF report here (multiple files supported)</strong>
       <span class="muted small">The file is read in your browser. Contractors are matched by email.</span>
     </div>
-    <button id="pick" class="btn primary" type="button">Choose PDF</button>
-    <input id="file" type="file" accept="application/pdf,.pdf" hidden>
+    <button id="pick" class="btn primary" type="button">Choose PDF(s)</button>
+    <input id="file" type="file" accept="application/pdf,.pdf" multiple hidden>
     <p id="dropErr" class="msg-err" role="alert" hidden></p>
   </section>
 
@@ -259,7 +259,15 @@ svg.chart .dot.last { fill: var(--accent); }
 var MONTHS = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
 function pad(n) { return String(n).padStart(2, '0'); }
 function to24(h, m, ap) { var x = Number(h) % 12; if (/pm/i.test(ap)) x += 12; return pad(x) + ':' + m; }
-function parseNum(s) { return Number(String(s).replace(/,/g, '')); }
+function parseNum(s) { 
+  if (s == null) return 0;
+  var str = String(s).trim().toLowerCase();
+  var mult = 1;
+  if (str.endsWith('k')) { mult = 1000; str = str.slice(0, -1); }
+  else if (str.endsWith('m')) { mult = 1000000; str = str.slice(0, -1); }
+  var n = Number(str.replace(/,/g, ''));
+  return isNaN(n) ? 0 : Math.round(n * mult);
+}
 function validEmail(e) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); }
 function displayName(email) {
   var local = String(email).split('@')[0];
@@ -270,7 +278,9 @@ var TABLES = [
   ['reviewed', /review counts by contractor/i, 'Review counts by contractor'],
   ['allowed', /content caught by moderation system and allowed by contractor/i, 'Content caught by moderation system and allowed by contractor']
 ];
-var ROW = /^(\S+@\S+)\s+([\d,]+)(?:\s+(\d+(?:\.\d+)?)\s*%)?$/;
+var ROW = /^(\S+@\S+)\s*\|\s*([\d,.]+[kKmMgG]?)(?:\s*\|\s*(\d+(?:\.\d+)?)\s*%)?$/;
+var ROW_ALT = /^(\S+@\S+)\s+([\d,.]+[kKmMgG]?)(?:\s+(\d+(?:\.\d+)?)\s*%)?$/;
+
 function parseReport(lines, fileName, headline) {
   var warnings = [];
   headline = headline || {};
@@ -298,7 +308,7 @@ function parseReport(lines, fileName, headline) {
     TABLES.forEach(function (t) { if (t[1].test(l)) hit = t[0]; });
     if (hit) { cur = hit; seen[hit] = true; return; }
     if (!cur || cur === 'skip') return;
-    var m = l.match(ROW);
+    var m = l.match(ROW) || l.match(ROW_ALT);
     if (!m) return;
     sec[cur].push({ email: m[1].toLowerCase(), n: parseNum(m[2]), pct: m[3] != null ? parseFloat(m[3]) : null });
   });
@@ -333,8 +343,7 @@ function parseReport(lines, fileName, headline) {
   return { date: date, start: start, end: end, tz: tz, rows: rows, warnings: warnings,
     reviewedTotal: hasRev ? headline.reviewed : null, rejected: hasRej ? headline.rejected : null };
 }
-// Reads the big headline numbers (large type) that sit under a tile title.
-// items: [{s, x, y, size}] with y increasing upward, as PDF.js reports it.
+
 function findHeadlines(items) {
   var out = { reviewed: null, rejected: null };
   var bigs = items.filter(function (i) { return i.size >= 40 && i.s.trim(); });
@@ -347,7 +356,7 @@ function findHeadlines(items) {
   });
   var titles = items.filter(function (i) { return i.size < 20 && i.x < 300 && /^(comments|tasks)/i.test(i.s.trim()); });
   groups.forEach(function (g) {
-    if (!/^[\d,]+$/.test(g.s) || g.x > 375) return;
+    if (!/^[\d,.]+[kKmMgG]?$/.test(g.s) || g.x > 375) return;
     var best = null;
     titles.forEach(function (t) { if (t.y > g.y && (!best || t.y < best.y)) best = t; });
     if (!best) return;
@@ -370,7 +379,7 @@ function findHeadlines(items) {
   var LS_REPORTS = 'contractor-tracker:reports', LS_THR = 'contractor-tracker:threshold';
 
   var store = { mode: 'loading', db: null, reports: [], downloads: null };
-  var state = { mode: 'day', anchor: '', sortKey: 'pct', sortDir: 'desc', who: 'team', pending: null, confirmDel: '' };
+  var state = { mode: 'day', anchor: '', sortKey: 'pct', sortDir: 'desc', who: 'team', pendingQueue: [], confirmDel: '' };
 
   function h(tag, props, kids) {
     var e = document.createElement(tag);
@@ -397,7 +406,6 @@ function findHeadlines(items) {
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
 
-  /* ---------- formatting and dates ---------- */
   function fmtInt(n) { return Number(n).toLocaleString('en-US'); }
   function fmtPct(p) { return p == null ? '–' : p.toFixed(2) + '%'; }
   function fmtTime(t) {
@@ -432,50 +440,47 @@ function findHeadlines(items) {
     var d = ymdToDate(anchor); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + dir);
     return dateToYmd(d);
   }
-  function todayYmd() { var n = new Date(); return n.getFullYear() + '-' + pad(n.getMonth() + 1) + '-' + pad(n.getDate()); }
   function latestDate() {
     var d = ''; store.reports.forEach(function (r) { if (r.date > d) d = r.date; });
     return d;
   }
   function getThreshold() { var v = parseFloat($('thr').value); return isNaN(v) ? 0 : v; }
 
-  /* ---------- aggregation ---------- */
   function aggregate(reports) {
     var map = {};
     reports.forEach(function (r) {
       r.rows.forEach(function (row) {
         var k = String(row.email).toLowerCase();
-        var a = map[k] || (map[k] = { email: k, reviewed: 0, allowed: 0, base: 0 });
+        var a = map[k] || (map[k] = { email: k, reviewed: 0, allowed: 0 });
         a.reviewed += row.reviewed || 0;
         a.allowed += row.allowed || 0;
-        if (row.allowed > 0 && row.pct > 0) a.base += row.allowed * 100 / row.pct;
       });
     });
+    var teamTotalAllowed = 0;
+    Object.keys(map).forEach(function (k) { teamTotalAllowed += map[k].allowed; });
     return Object.keys(map).map(function (k) {
       var a = map[k];
-      a.pct = a.base > 0 ? a.allowed * 100 / a.base : (a.allowed === 0 ? 0 : null);
+      a.pct = teamTotalAllowed > 0 ? (a.allowed / teamTotalAllowed) * 100 : (a.allowed === 0 ? 0 : null);
       return a;
     });
   }
-  function reportBase(r) {
-    var b = 0;
-    r.rows.forEach(function (x) { if (x.allowed > 0 && x.pct > 0) b += x.allowed * 100 / x.pct; });
-    return b;
-  }
-  // Totals for any set of reports. Uses the PDF headline numbers when a report has them,
-  // otherwise works them out from the contractor tables.
+
   function periodTotals(reports) {
     var t = { reviewed: 0, allowed: 0, rejected: 0, unlisted: 0 };
     reports.forEach(function (r) {
-      var rowRev = 0, al = 0;
-      r.rows.forEach(function (x) { rowRev += x.reviewed || 0; al += x.allowed || 0; });
+      var rowRev = 0, al = 0, rowRej = 0;
+      r.rows.forEach(function (x) { 
+        rowRev += x.reviewed || 0; 
+        al += x.allowed || 0; 
+        if (x.allowed > 0 && x.pct > 0) rowRej += x.allowed * 100 / x.pct;
+      });
       var rev = typeof r.reviewedTotal === 'number' ? r.reviewedTotal : rowRev;
       t.reviewed += rev;
       t.allowed += al;
-      t.rejected += typeof r.rejected === 'number' ? r.rejected : reportBase(r);
+      t.rejected += typeof r.rejected === 'number' ? r.rejected : rowRej;
       if (rev > rowRev) t.unlisted += rev - rowRev;
     });
-    t.pct = t.rejected > 0 ? t.allowed * 100 / t.rejected : 0;
+    t.pct = t.rejected > 0 ? (t.allowed / t.rejected) * 100 : 0;
     return t;
   }
   function inPeriod() {
@@ -484,7 +489,6 @@ function findHeadlines(items) {
     return store.reports.filter(function (r) { return r.date >= p.from && r.date <= p.to; });
   }
 
-  /* ---------- storage ---------- */
   function validDoc(d) { return d && typeof d.date === 'string' && Array.isArray(d.rows); }
   function sortReports() {
     store.reports.sort(function (a, b) { return a.date === b.date ? String(a.start).localeCompare(String(b.start)) : a.date.localeCompare(b.date); });
@@ -550,7 +554,6 @@ function findHeadlines(items) {
     return Promise.resolve();
   }
 
-  /* ---------- PDF reading ---------- */
   function extractLines(file) {
     if (!window.pdfjsLib) return Promise.reject(new Error('The PDF reader did not load. Check your connection and reload the page.'));
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -596,26 +599,34 @@ function findHeadlines(items) {
     });
   }
 
-  function handleFile(file) {
+  function handleFiles(files) {
     var err = $('dropErr'); err.hidden = true;
-    if (!file) return;
-    if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
-      err.textContent = 'That file is not a PDF. Drop the report exactly as the client sent it.'; err.hidden = false; return;
+    if (!files || !files.length) return;
+    var fileList = Array.from(files);
+    var invalid = fileList.find(function (f) { return !/\.pdf$/i.test(f.name) && f.type !== 'application/pdf'; });
+    if (invalid) {
+      err.textContent = 'One or more selected files are not PDFs. Drop reports exactly as the client sent them.'; err.hidden = false; return;
     }
-    extractLines(file).then(function (res) {
-      var parsed = parseReport(res.lines, file.name, res.headline);
-      if (!parsed.rows.length) {
-        err.textContent = 'No contractor rows were found in this PDF. Check that it is the Moderation - Human Review report.'; err.hidden = false; return;
-      }
-      state.pending = { parsed: parsed, fileName: file.name };
+
+    var promises = fileList.map(function (file) {
+      return extractLines(file).then(function (res) {
+        var parsed = parseReport(res.lines, file.name, res.headline);
+        if (!parsed.rows.length) {
+          throw new Error('No contractor rows found in ' + file.name + '. Check that it is the Moderation - Human Review report.');
+        }
+        return { parsed: parsed, fileName: file.name };
+      });
+    });
+
+    Promise.all(promises).then(function (results) {
+      state.pendingQueue = results;
       renderPreview();
       $('preview').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }).catch(function (e) {
-      err.textContent = (e && e.message) || 'This PDF could not be read.'; err.hidden = false;
+      err.textContent = (e && e.message) || 'One of the PDFs could not be read.'; err.hidden = false;
     });
   }
 
-  /* ---------- rendering ---------- */
   function renderStatus() {
     var s = $('status');
     s.className = 'status ' + (store.mode === 'shared' ? 'shared' : store.mode === 'local' ? 'local' : '');
@@ -626,79 +637,96 @@ function findHeadlines(items) {
 
   function renderPreview() {
     var box = $('preview');
-    var p = state.pending;
-    if (!p) { box.hidden = true; box.textContent = ''; return; }
-    var parsed = p.parsed;
+    if (!state.pendingQueue.length) { box.hidden = true; box.textContent = ''; return; }
     box.hidden = false; box.textContent = '';
 
-    var dateInput = h('input', { id: 'pvDate', type: 'date', value: parsed.date || '' });
-    var replaceNote = h('div', { class: 'notice', hidden: true });
-    var saveBtn = h('button', { class: 'btn primary', type: 'button', text: 'Save report' });
-    function refresh() {
-      var id = reportId(dateInput.value, parsed.start, parsed.end);
-      var exists = dateInput.value && store.reports.some(function (r) { return r.id === id; });
-      replaceNote.hidden = !exists;
-      replaceNote.textContent = exists ? 'A report for this date and time range is already saved. Saving will replace it.' : '';
-      saveBtn.disabled = !dateInput.value;
-    }
-    dateInput.addEventListener('input', refresh);
+    box.appendChild(h('div', { class: 'panel-head' }, [
+      h('h2', { text: 'Review & Save Reports (' + state.pendingQueue.length + ' file' + (state.pendingQueue.length === 1 ? '' : 's') + ')' }),
+      h('span', { class: 'muted small', text: 'Confirm dates before saving' })
+    ]));
 
-    saveBtn.addEventListener('click', function () {
-      var date = dateInput.value;
-      if (!date) return;
-      var rep = {
-        id: reportId(date, parsed.start, parsed.end), date: date, start: parsed.start, end: parsed.end, tz: parsed.tz,
-        source: p.fileName, savedAt: new Date().toISOString(), rows: parsed.rows,
-        reviewedTotal: parsed.reviewedTotal, rejected: parsed.rejected
-      };
-      saveBtn.disabled = true;
-      persistReport(rep).then(function () {
-        state.pending = null; state.anchor = date; state.confirmDel = '';
-        renderPreview(); renderAll();
-        toast('Report saved for ' + md(date));
-      }).catch(function (e) {
-        saveBtn.disabled = false;
-        toast(e && e.code === 'invalid_argument' ? 'You do not have permission to save reports here.' : 'The report could not be saved. Try again.');
-      });
+    var body = h('div', { class: 'panel-body' }, []);
+    
+    var itemContainers = state.pendingQueue.map(function (item, idx) {
+      var parsed = item.parsed;
+      var dateInput = h('input', { type: 'date', value: parsed.date || '' });
+      var replaceNote = h('div', { class: 'notice', hidden: true });
+      
+      function refresh() {
+        var id = reportId(dateInput.value, parsed.start, parsed.end);
+        var exists = dateInput.value && store.reports.some(function (r) { return r.id === id; });
+        replaceNote.hidden = !exists;
+        replaceNote.textContent = exists ? 'A report for this date and time range is already saved. Saving will replace it.' : '';
+      }
+      dateInput.addEventListener('input', refresh);
+      refresh();
+
+      item.dateInput = dateInput;
+
+      var range = parsed.start ? fmtTime(parsed.start) + ' – ' + fmtTime(parsed.end) + (parsed.tz ? ' (' + parsed.tz + ')' : '') : 'Not found';
+      
+      var thead = h('tr', null, [
+        h('th', { text: 'Contractor' }), h('th', { class: 'r', text: 'Reviewed' }),
+        h('th', { class: 'r', text: 'Comments allowed' }), h('th', { class: 'r', text: '% allowed' })
+      ]);
+      var tbody = h('tbody', null, parsed.rows.map(function (r) {
+        return h('tr', null, [
+          h('td', null, [h('div', { class: 'who', text: displayName(r.email) }), h('div', { class: 'em', text: r.email })]),
+          h('td', { class: 'r num', text: fmtInt(r.reviewed) }),
+          h('td', { class: 'r num', text: r.allowed == null ? '–' : fmtInt(r.allowed) }), 
+          h('td', { class: 'r num', text: fmtPct(r.pct) })
+        ]);
+      }));
+
+      var fileBox = h('div', { style: 'margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--line);' }, [
+        h('strong', { text: item.fileName, style: 'display:block; margin-bottom: 8px;' }),
+        h('div', { class: 'pv-grid' }, [
+          h('div', { class: 'field' }, [h('label', { text: 'Report date' }), dateInput]),
+          h('div', { class: 'field' }, [h('label', { text: 'Time range' }), h('div', { text: range })]),
+          h('div', { class: 'field' }, [h('label', { text: 'Contractors' }), h('div', { class: 'num', text: String(parsed.rows.length) })]),
+          h('div', { class: 'field' }, [h('label', { text: 'Reviewed' }), h('div', { class: 'num', text: parsed.reviewedTotal == null ? 'Not found' : fmtInt(parsed.reviewedTotal) })])
+        ])
+      ]);
+      if (parsed.warnings.length) {
+        fileBox.appendChild(h('div', { class: 'notices' }, parsed.warnings.map(function (w) { return h('div', { class: 'notice', text: w }); })));
+      }
+      fileBox.appendChild(replaceNote);
+      fileBox.appendChild(h('div', { class: 'scroll mt12' }, [h('table', null, [h('thead', null, [thead]), tbody])]));
+      return fileBox;
     });
 
-    var range = parsed.start ? fmtTime(parsed.start) + ' – ' + fmtTime(parsed.end) + (parsed.tz ? ' (' + parsed.tz + ')' : '') : 'Not found';
-    var thead = h('tr', null, [
-      h('th', { text: 'Contractor' }), h('th', { class: 'r', text: 'Reviewed' }),
-      h('th', { class: 'r', text: 'Comments allowed' }), h('th', { class: 'r', text: '% allowed' })
-    ]);
-    var tbody = h('tbody', null, parsed.rows.map(function (r) {
-      return h('tr', null, [
-        h('td', null, [h('div', { class: 'who', text: displayName(r.email) }), h('div', { class: 'em', text: r.email })]),
-        h('td', { class: 'r num', text: fmtInt(r.reviewed) }),
-        h('td', { class: 'r num', text: r.allowed == null ? '–' : fmtInt(r.allowed) }), h('td', { class: 'r num', text: fmtPct(r.pct) })
-      ]);
-    }));
+    itemContainers.forEach(function (ic) { body.appendChild(ic); });
 
-    box.appendChild(h('div', { class: 'panel-head' }, [
-      h('h2', { text: 'Check before saving' }),
-      h('span', { class: 'muted small', text: p.fileName })
-    ]));
-    var body = h('div', { class: 'panel-body' }, [
-      h('div', { class: 'pv-grid' }, [
-        h('div', { class: 'field' }, [h('label', { for: 'pvDate', text: 'Report date' }), dateInput]),
-        h('div', { class: 'field' }, [h('label', { text: 'Time range in report' }), h('div', { text: range })]),
-        h('div', { class: 'field' }, [h('label', { text: 'Contractors found' }), h('div', { class: 'num', text: String(parsed.rows.length) })]),
-        h('div', { class: 'field' }, [h('label', { text: 'Reviewed (PDF total)' }), h('div', { class: 'num', text: parsed.reviewedTotal == null ? 'Not found' : fmtInt(parsed.reviewedTotal) })]),
-        h('div', { class: 'field' }, [h('label', { text: 'Rejected by moderation' }), h('div', { class: 'num', text: parsed.rejected == null ? 'Not found' : fmtInt(parsed.rejected) })])
-      ])
-    ]);
-    if (parsed.warnings.length) {
-      body.appendChild(h('div', { class: 'notices' }, parsed.warnings.map(function (w) { return h('div', { class: 'notice', text: w }); })));
-    }
-    body.appendChild(replaceNote);
-    body.appendChild(h('div', { class: 'scroll mt12' }, [h('table', null, [h('thead', null, [thead]), tbody])]));
-    body.appendChild(h('div', { class: 'actions' }, [
-      saveBtn,
-      h('button', { class: 'btn', type: 'button', text: 'Cancel', onclick: function () { state.pending = null; renderPreview(); } })
-    ]));
+    var saveAllBtn = h('button', { class: 'btn primary', type: 'button', text: 'Save All Reports', onclick: function () {
+      saveAllBtn.disabled = true;
+      var promises = state.pendingQueue.map(function (item) {
+        var date = item.dateInput.value;
+        if (!date) return Promise.resolve();
+        var parsed = item.parsed;
+        var rep = {
+          id: reportId(date, parsed.start, parsed.end), date: date, start: parsed.start, end: parsed.end, tz: parsed.tz,
+          source: item.fileName, savedAt: new Date().toISOString(), rows: parsed.rows,
+          reviewedTotal: parsed.reviewedTotal, rejected: parsed.rejected
+        };
+        return persistReport(rep);
+      });
+
+      Promise.all(promises).then(function () {
+        var lastDate = state.pendingQueue[state.pendingQueue.length - 1].dateInput.value;
+        state.pendingQueue = [];
+        if (lastDate) state.anchor = lastDate;
+        renderPreview(); renderAll();
+        toast('All reports saved successfully');
+      }).catch(function (e) {
+        saveAllBtn.disabled = false;
+        toast('Some reports could not be saved. Try again.');
+      });
+    }});
+
+    var cancelBtn = h('button', { class: 'btn', type: 'button', text: 'Cancel', onclick: function () { state.pendingQueue = []; renderPreview(); } });
+
+    body.appendChild(h('div', { class: 'actions' }, [saveAllBtn, cancelBtn]));
     box.appendChild(body);
-    refresh();
   }
 
   function sortRows(rows) {
@@ -736,7 +764,7 @@ function findHeadlines(items) {
     var rows = aggregate(reps);
     renderStats(rows, reps);
     $('tcount').textContent = rows.length ? rows.length + ' contractors' : '';
-    var foot = 'Error means content the moderation system caught and the contractor allowed. % allowed is comments allowed divided by comments the moderation system rejected.';
+    var foot = 'Error means content the moderation system caught and the contractor allowed. Individual % allowed is computed as individual comments allowed divided by the team comments allowed.';
     var tt = periodTotals(reps);
     if (tt.unlisted > 0) foot += ' The totals above include ' + fmtInt(tt.unlisted) + ' reviews from contractors who are not listed in the PDF tables.';
     $('tfoot').textContent = foot;
@@ -826,7 +854,7 @@ function findHeadlines(items) {
       } else {
         var rows = aggregate(byDate[d]).filter(function (x) { return x.email === who; });
         if (!rows.length) return;
-        out.push({ date: d, pct: rows[0].pct == null ? 0 : rows[0].pct, allowed: rows[0].allowed, reviewed: rows[0].reviewed });
+        out.push({ date: d, pct: rows[0].pct == null ? 0 : rows[0].pct, allowed: rows[0].allowed, reviewed: 0 });
       }
     });
     return out;
@@ -869,7 +897,7 @@ function findHeadlines(items) {
     pts.forEach(function (p, i) {
       var last = i === pts.length - 1;
       var dot = svg('circle', { class: 'dot' + (last ? ' last' : ''), cx: X(i), cy: Y(p.pct), r: 4.5 });
-      dot.appendChild(svg('title', {}, md(p.date) + ': ' + fmtPct(p.pct) + ' (' + p.allowed + ' allowed of ' + p.reviewed + ' reviewed)'));
+      dot.appendChild(svg('title', {}, md(p.date) + ': ' + fmtPct(p.pct) + ' (' + p.allowed + ' allowed)'));
       s.appendChild(dot);
       if (pts.length <= 8 || last) s.appendChild(svg('text', { class: 'val', x: X(i), y: Y(p.pct) - 11, 'text-anchor': 'middle' }, p.pct.toFixed(1) + '%'));
       if (i % every === 0 || last) s.appendChild(svg('text', { x: X(i), y: ht - 9, 'text-anchor': 'middle' }, md(p.date)));
@@ -913,10 +941,9 @@ function findHeadlines(items) {
 
   function renderAll() {
     renderStatus(); renderControls(); renderTable(); renderWho(); drawTrend(); renderReports();
-    if (state.pending) renderPreview();
+    if (state.pendingQueue.length) renderPreview();
   }
 
-  /* ---------- CSV ---------- */
   function csvCell(v) { v = String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
   function saveFile(filename, text) {
     if (store.downloads) return store.downloads.save({ filename: filename, data: text });
@@ -943,7 +970,6 @@ function findHeadlines(items) {
       .catch(function (e) { if (!e || e.code !== 'declined') toast('The CSV could not be saved here.'); });
   }
 
-  /* ---------- wiring ---------- */
   document.querySelectorAll('.seg button').forEach(function (b) {
     b.addEventListener('click', function () { state.mode = b.getAttribute('data-mode'); renderAll(); });
   });
@@ -957,14 +983,14 @@ function findHeadlines(items) {
 
   var drop = $('drop'), fileInput = $('file');
   $('pick').addEventListener('click', function () { fileInput.click(); });
-  fileInput.addEventListener('change', function () { handleFile(fileInput.files[0]); fileInput.value = ''; });
+  fileInput.addEventListener('change', function () { handleFiles(fileInput.files); fileInput.value = ''; });
   ['dragenter', 'dragover'].forEach(function (ev) {
     drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); });
   });
   ['dragleave', 'drop'].forEach(function (ev) {
     drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); });
   });
-  drop.addEventListener('drop', function (e) { handleFile(e.dataTransfer && e.dataTransfer.files[0]); });
+  drop.addEventListener('drop', function (e) { handleFiles(e.dataTransfer && e.dataTransfer.files); });
   window.addEventListener('dragover', function (e) { e.preventDefault(); });
   window.addEventListener('drop', function (e) { e.preventDefault(); });
 
