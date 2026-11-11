@@ -259,13 +259,7 @@ svg.chart .dot.last { fill: var(--accent); }
 var MONTHS = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
 function pad(n) { return String(n).padStart(2, '0'); }
 function to24(h, m, ap) { var x = Number(h) % 12; if (/pm/i.test(ap)) x += 12; return pad(x) + ':' + m; }
-function parseNum(s) {
-  var str = String(s).trim().toLowerCase();
-  if (str.slice(-1) === 'k') {
-    return Math.round(parseFloat(str) * 1000);
-  }
-  return Number(str.replace(/,/g, ''));
-}
+function parseNum(s) { return Number(String(s).replace(/,/g, '')); }
 function validEmail(e) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); }
 function displayName(email) {
   var local = String(email).split('@')[0];
@@ -276,7 +270,7 @@ var TABLES = [
   ['reviewed', /review counts by contractor/i, 'Review counts by contractor'],
   ['allowed', /content caught by moderation system and allowed by contractor/i, 'Content caught by moderation system and allowed by contractor']
 ];
-var ROW = /^(\S+@\S+)\s+([\d,]+(?:\.\d+)?k?)(?:\s+(\d+(?:\.\d+)?)\s*%)?$/i;
+var ROW = /^(\S+@\S+)\s+([\d,]+)(?:\s+(\d+(?:\.\d+)?)\s*%)?$/;
 function parseReport(lines, fileName, headline) {
   var warnings = [];
   headline = headline || {};
@@ -316,16 +310,8 @@ function parseReport(lines, fileName, headline) {
   }
   sec.reviewed.forEach(function (r) { get(r.email).reviewed = r.n; });
   var inAllowed = {};
-  sec.allowed.forEach(function (r) { var o = get(r.email); o.allowed = r.n; inAllowed[r.email] = true; });
-  if (seen.allowed) order.forEach(function (e) { if (!inAllowed[e]) { map[e].allowed = 0; } });
-
-  // Calculate % allowed as individual allowed / team total allowed
-  var teamAllowed = 0;
-  order.forEach(function (e) { teamAllowed += map[e].allowed; });
-  order.forEach(function (e) {
-    var r = map[e];
-    r.pct = teamAllowed > 0 ? (r.allowed / teamAllowed) * 100 : 0;
-  });
+  sec.allowed.forEach(function (r) { var o = get(r.email); o.allowed = r.n; o.pct = r.pct; inAllowed[r.email] = true; });
+  if (seen.allowed) order.forEach(function (e) { if (!inAllowed[e]) { map[e].allowed = 0; map[e].pct = 0; } });
 
   TABLES.forEach(function (t) {
     if (t[0] === 'skip') return;
@@ -456,25 +442,24 @@ function findHeadlines(items) {
   /* ---------- aggregation ---------- */
   function aggregate(reports) {
     var map = {};
-    var teamAllowed = 0;
     reports.forEach(function (r) {
       r.rows.forEach(function (row) {
         var k = String(row.email).toLowerCase();
-        var a = map[k] || (map[k] = { email: k, reviewed: 0, allowed: 0 });
+        var a = map[k] || (map[k] = { email: k, reviewed: 0, allowed: 0, base: 0 });
         a.reviewed += row.reviewed || 0;
         a.allowed += row.allowed || 0;
-        teamAllowed += row.allowed || 0;
+        if (row.allowed > 0 && row.pct > 0) a.base += row.allowed * 100 / row.pct;
       });
     });
     return Object.keys(map).map(function (k) {
       var a = map[k];
-      a.pct = teamAllowed > 0 ? (a.allowed / teamAllowed) * 100 : 0;
+      a.pct = a.base > 0 ? a.allowed * 100 / a.base : (a.allowed === 0 ? 0 : null);
       return a;
     });
   }
   function reportBase(r) {
     var b = 0;
-    r.rows.forEach(function (x) { b += x.allowed || 0; });
+    r.rows.forEach(function (x) { if (x.allowed > 0 && x.pct > 0) b += x.allowed * 100 / x.pct; });
     return b;
   }
   // Totals for any set of reports. Uses the PDF headline numbers when a report has them,
@@ -669,7 +654,7 @@ function findHeadlines(items) {
       saveBtn.disabled = true;
       persistReport(rep).then(function () {
         state.pending = null; state.anchor = date; state.confirmDel = '';
-        renderAll();
+        renderPreview(); renderAll();
         toast('Report saved for ' + md(date));
       }).catch(function (e) {
         saveBtn.disabled = false;
@@ -713,7 +698,6 @@ function findHeadlines(items) {
       h('button', { class: 'btn', type: 'button', text: 'Cancel', onclick: function () { state.pending = null; renderPreview(); } })
     ]));
     box.appendChild(body);
-    renderPreview();
     refresh();
   }
 
@@ -752,7 +736,7 @@ function findHeadlines(items) {
     var rows = aggregate(reps);
     renderStats(rows, reps);
     $('tcount').textContent = rows.length ? rows.length + ' contractors' : '';
-    var foot = 'Error means content the moderation system caught and the contractor allowed. % allowed is individual comments allowed divided by team total comments allowed.';
+    var foot = 'Error means content the moderation system caught and the contractor allowed. % allowed is comments allowed divided by comments the moderation system rejected.';
     var tt = periodTotals(reps);
     if (tt.unlisted > 0) foot += ' The totals above include ' + fmtInt(tt.unlisted) + ' reviews from contractors who are not listed in the PDF tables.';
     $('tfoot').textContent = foot;
