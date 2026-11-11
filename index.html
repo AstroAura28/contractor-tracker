@@ -669,7 +669,7 @@ function findHeadlines(items) {
       saveBtn.disabled = true;
       persistReport(rep).then(function () {
         state.pending = null; state.anchor = date; state.confirmDel = '';
-        renderPreview(); renderAll();
+        renderAll();
         toast('Report saved for ' + md(date));
       }).catch(function (e) {
         saveBtn.disabled = false;
