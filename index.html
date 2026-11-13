@@ -386,9 +386,9 @@ function findHeadlines(items) {
   var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var MONFULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  var LS_REPORTS = 'contractor-tracker:reports', LS_THR = 'contractor-tracker:threshold';
+  var LS_THR = 'contractor-tracker:threshold';
 
-  var store = { mode: 'loading', db: null, reports: [], downloads: null };
+  var store = { mode: 'loading', reports: [], downloads: null };
   var state = { mode: 'day', anchor: '', shiftFilter: 'all', sortKey: 'pct', sortDir: 'desc', who: 'team', pendingQueue: [], confirmDel: '' };
 
   function h(tag, props, kids) {
@@ -528,59 +528,51 @@ function findHeadlines(items) {
     if (!state.anchor && store.reports.length) state.anchor = latestDate();
     renderAll();
   }
-  function loadLocal() {
-    var list = [];
-    try { list = JSON.parse(lsGet(LS_REPORTS) || '[]'); } catch (e) { list = []; }
-    onReports(Array.isArray(list) ? list : []);
-  }
-  function saveLocal() { lsSet(LS_REPORTS, JSON.stringify(store.reports)); }
-
-  function initStorage() {
-    var api = window.claude;
-    var none = Promise.resolve(null);
-    var useDb = api && api.use ? api.use('db').catch(function () { return null; }) : none;
-    var useDl = api && api.use ? api.use('downloads').catch(function () { return null; }) : none;
-    Promise.all([useDb, useDl]).then(function (res) {
-      var db = res[0];
-      store.downloads = res[1];
-      if (!db) {
-        store.mode = 'local';
-        loadLocal();
-        return;
+  // Storage: reports live in Postgres behind the Express API (same origin).
+  // The browser sends the site password automatically (HTTP Basic auth prompt).
+  function api(method, url, body) {
+    var opts = { method: method, credentials: 'same-origin', headers: {} };
+    if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    return fetch(url, opts).then(function (res) {
+      if (!res.ok) {
+        return res.text().then(function (t) {
+          var err = new Error(t || ('HTTP ' + res.status)); err.status = res.status; throw err;
+        });
       }
-      store.db = db; store.mode = 'shared';
-      renderStatus();
-      var timer = setTimeout(function () {
-        $('status').textContent = 'Shared history is slow to respond. Showing what is loaded.';
-      }, 10000);
-      db.collection('reports').onSnapshot(function (snap) {
-        clearTimeout(timer);
-        onReports(snap.docs.map(function (d) { return Object.assign({}, d.data(), { id: d.id }); }));
-      }, function (err) {
-        clearTimeout(timer);
-        store.mode = 'local';
-        toast('Shared history stopped (' + (err && err.code || 'error') + '). Switched to this browser.');
-        loadLocal();
-      });
+      return res.json();
     });
+  }
+  function loadReports(initial) {
+    return api('GET', '/api/reports').then(function (list) {
+      store.mode = 'shared';
+      onReports(list);
+    }).catch(function (e) {
+      if (initial || store.mode === 'loading') store.mode = 'error';
+      renderStatus();
+      if (initial) renderAll();
+    });
+  }
+  function initStorage() {
+    loadReports(true);
+    // Pick up reports saved by teammates without a manual refresh.
+    setInterval(function () {
+      if (document.hidden || state.pendingQueue.length) return;
+      loadReports(false);
+    }, 30000);
   }
   function reportId(date, start, end) {
     return date + '_' + (start ? start.replace(':', '') : 'x') + '-' + (end ? end.replace(':', '') : 'x');
   }
   function persistReport(rep) {
-    if (store.mode === 'shared') {
-      var body = Object.assign({}, rep); delete body.id;
-      return store.db.doc('reports/' + rep.id).set(body);
-    }
-    store.reports = store.reports.filter(function (r) { return r.id !== rep.id; });
-    store.reports.push(rep); sortReports(); saveLocal();
-    return Promise.resolve();
+    return api('PUT', '/api/reports/' + encodeURIComponent(rep.id), rep).then(function () {
+      store.reports = store.reports.filter(function (r) { return r.id !== rep.id; });
+      store.reports.push(rep); sortReports();
+    });
   }
   function removeReport(id) {
-    if (store.mode === 'shared') return store.db.doc('reports/' + id).delete();
-    store.reports = store.reports.filter(function (r) { return r.id !== id; });
-    saveLocal();
-    return Promise.resolve();
+    return api('DELETE', '/api/reports/' + encodeURIComponent(id)).then(function () {
+      store.reports = store.reports.filter(function (r) { return r.id !== id; });
+    });
   }
 
   function extractLines(file) {
@@ -658,9 +650,9 @@ function findHeadlines(items) {
 
   function renderStatus() {
     var s = $('status');
-    s.className = 'status ' + (store.mode === 'shared' ? 'shared' : store.mode === 'local' ? 'local' : '');
+    s.className = 'status ' + (store.mode === 'shared' ? 'shared' : store.mode === 'error' ? 'local' : '');
     s.textContent = store.mode === 'shared' ? 'Shared history, saved for the whole team'
-      : store.mode === 'local' ? 'Saved in this browser only'
+      : store.mode === 'error' ? 'Cannot reach the server. Reports are not loading or saving.'
       : 'Loading saved reports';
   }
 
@@ -748,7 +740,8 @@ function findHeadlines(items) {
         toast('All reports saved successfully');
       }).catch(function (e) {
         saveAllBtn.disabled = false;
-        toast('Some reports could not be saved. Try again.');
+        toast('Some reports could not be saved to the server. Try again.');
+        loadReports(false);
       });
     }});
 
@@ -954,7 +947,7 @@ function findHeadlines(items) {
         cell = h('div', { class: 'rowend' }, [
           h('button', { class: 'btn danger', type: 'button', text: 'Remove report', onclick: function () {
             removeReport(r.id).then(function () { state.confirmDel = ''; renderAll(); toast('Report removed'); })
-              .catch(function () { toast('You do not have permission to remove reports here.'); });
+              .catch(function () { toast('The report could not be removed. Try again.'); });
           } }),
           h('button', { class: 'btn', type: 'button', text: 'Keep', onclick: function () { state.confirmDel = ''; renderReports(); } })
         ]);
