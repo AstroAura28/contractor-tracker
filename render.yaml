@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: contractor-review-tracker
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: contractor-review-db
+          property: connectionString
+      - key: APP_USER
+        value: team
+      - key: APP_PASSWORD
+        sync: false # you will be asked for this value when creating the Blueprint
+
+databases:
+  - name: contractor-review-db
+    # Use a paid plan: Render's free Postgres expires after 30 days and its data is deleted.
+    plan: basic-256mb
