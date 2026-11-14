@@ -179,6 +179,11 @@ svg.chart .ln { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linej
 svg.chart .dot { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
 svg.chart .dot.last { fill: var(--accent); }
 
+.topright { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.acct { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
+a.btn { text-decoration: none; display: inline-block; color: inherit; }
+.btn.small { padding: 4px 10px; font-size: 12.5px; }
+body:not(.is-admin) .admin-only { display: none !important; }
 #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 6px; font-weight: 500; max-width: calc(100% - 32px); z-index: 20; }
 @media (prefers-reduced-motion: reduce) { .drop { transition: none; } }
 </style>
@@ -189,10 +194,18 @@ svg.chart .dot.last { fill: var(--accent); }
       <h1>Contractor Review Tracker</h1>
       <p class="sub">Moderation human review, built from the client's PDF reports</p>
     </div>
-    <span id="status" class="status">Loading saved reports</span>
+    <div class="topright">
+      <span id="status" class="status">Loading saved reports</span>
+      <div class="acct">
+        <span id="me" class="muted small"></span>
+        <a id="adminLink" class="btn small admin-only" href="/admin">Manage access</a>
+        <a class="btn small" href="/login?change=1">Change password</a>
+        <button id="signout" class="btn small" type="button">Sign out</button>
+      </div>
+    </div>
   </header>
 
-  <section id="drop" class="drop" aria-label="Add a report">
+  <section id="drop" class="drop admin-only" aria-label="Add a report">
     <div class="txt">
       <strong>Drop the client's PDF report here (multiple files supported)</strong>
       <span class="muted small">The file is read in your browser. Contractors are matched by email.</span>
@@ -202,7 +215,7 @@ svg.chart .dot.last { fill: var(--accent); }
     <p id="dropErr" class="msg-err" role="alert" hidden></p>
   </section>
 
-  <section id="preview" class="panel" hidden aria-label="Report preview"></section>
+  <section id="preview" class="panel admin-only" hidden aria-label="Report preview"></section>
 
   <section class="controls" aria-label="Period">
     <div class="seg" role="group" aria-label="View by">
@@ -388,7 +401,7 @@ function findHeadlines(items) {
   var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   var LS_THR = 'contractor-tracker:threshold';
 
-  var store = { mode: 'loading', reports: [], downloads: null };
+  var store = { mode: 'loading', reports: [], downloads: null, me: null };
   var state = { mode: 'day', anchor: '', shiftFilter: 'all', sortKey: 'pct', sortDir: 'desc', who: 'team', pendingQueue: [], confirmDel: '' };
 
   function h(tag, props, kids) {
@@ -533,14 +546,21 @@ function findHeadlines(items) {
   function api(method, url, body) {
     var opts = { method: method, credentials: 'same-origin', headers: {} };
     if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
-    return fetch(url, opts).then(function (res) {
-      if (!res.ok) {
-        return res.text().then(function (t) {
-          var err = new Error(t || ('HTTP ' + res.status)); err.status = res.status; throw err;
-        });
-      }
-      return res.json();
+    return fetch(url, opts).then(handleResponse);
+  }
+  function handleResponse(res) {
+    if (res.ok) return res.json();
+    return res.json().catch(function () { return {}; }).then(function (data) {
+      if (res.status === 401 || (res.status === 403 && data.mustChange)) { location.href = '/login'; }
+      var err = new Error(data.error || ('Something went wrong (' + res.status + ')'));
+      err.status = res.status; throw err;
     });
+  }
+  function isAdmin() { return !!(store.me && store.me.role === 'admin'); }
+  function applyRole() {
+    var me = store.me;
+    document.body.classList.toggle('is-admin', isAdmin());
+    $('me').textContent = me.email + ' \u00b7 ' + (me.role === 'admin' ? 'Admin' : 'Contractor');
   }
   function loadReports(initial) {
     return api('GET', '/api/reports').then(function (list) {
@@ -553,12 +573,24 @@ function findHeadlines(items) {
     });
   }
   function initStorage() {
-    loadReports(true);
-    // Pick up reports saved by teammates without a manual refresh.
-    setInterval(function () {
-      if (document.hidden || state.pendingQueue.length) return;
-      loadReports(false);
-    }, 30000);
+    api('GET', '/api/me').then(function (me) {
+      store.me = me; applyRole(); renderAll();
+      loadReports(true);
+      // Pick up reports saved by teammates without a manual refresh.
+      setInterval(function () {
+        if (document.hidden || state.pendingQueue.length) return;
+        loadReports(false);
+      }, 30000);
+    }).catch(function () { store.mode = 'error'; renderStatus(); });
+  }
+  function uploadPdf(id, file) {
+    // Resolves to the Drive link, or null when Drive is not set up. Rejects if Drive refuses the file.
+    if (!file || !isAdmin() || !store.me.drive) return Promise.resolve(null);
+    return fetch('/api/reports/' + encodeURIComponent(id) + '/pdf', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/pdf', 'X-File-Name': encodeURIComponent(file.name) },
+      body: file
+    }).then(handleResponse).then(function (r) { return r.driveUrl || null; });
   }
   function reportId(date, start, end) {
     return date + '_' + (start ? start.replace(':', '') : 'x') + '-' + (end ? end.replace(':', '') : 'x');
@@ -622,6 +654,7 @@ function findHeadlines(items) {
 
   function handleFiles(files) {
     var err = $('dropErr'); err.hidden = true;
+    if (!isAdmin()) return;
     if (!files || !files.length) return;
     var fileList = Array.from(files);
     var invalid = fileList.find(function (f) { return !/\.pdf$/i.test(f.name) && f.type !== 'application/pdf'; });
@@ -635,7 +668,7 @@ function findHeadlines(items) {
         if (!parsed.rows.length) {
           throw new Error('No contractor rows found in ' + file.name + '. Check that it is the Moderation - Human Review report.');
         }
-        return { parsed: parsed, fileName: file.name };
+        return { parsed: parsed, fileName: file.name, file: file };
       });
     });
 
@@ -720,6 +753,7 @@ function findHeadlines(items) {
 
     var saveAllBtn = h('button', { class: 'btn primary', type: 'button', text: 'Save All Reports', onclick: function () {
       saveAllBtn.disabled = true;
+      var driveFailed = 0;
       var promises = state.pendingQueue.map(function (item) {
         var date = item.dateInput.value;
         if (!date) return Promise.resolve();
@@ -729,7 +763,11 @@ function findHeadlines(items) {
           source: item.fileName, savedAt: new Date().toISOString(), rows: parsed.rows,
           reviewedTotal: parsed.reviewedTotal, rejected: parsed.rejected
         };
-        return persistReport(rep);
+        return persistReport(rep).then(function () {
+          return uploadPdf(rep.id, item.file).then(function (url) {
+            if (url) rep.driveUrl = url;
+          }, function () { driveFailed += 1; });
+        });
       });
 
       Promise.all(promises).then(function () {
@@ -737,7 +775,9 @@ function findHeadlines(items) {
         state.pendingQueue = [];
         if (lastDate) state.anchor = lastDate;
         renderPreview(); renderAll();
-        toast('All reports saved successfully');
+        toast(driveFailed
+          ? 'Reports saved, but ' + driveFailed + ' PDF(s) could not be stored in Google Drive. Check Manage access > Google Drive.'
+          : 'All reports saved successfully');
       }).catch(function (e) {
         saveAllBtn.disabled = false;
         toast('Some reports could not be saved to the server. Try again.');
@@ -937,7 +977,8 @@ function findHeadlines(items) {
     $('rcount').textContent = store.reports.length ? store.reports.length + ' saved' : '';
     if (!store.reports.length) { box.appendChild(h('div', { class: 'empty', text: 'Nothing saved yet.' })); return; }
     var list = store.reports.slice().reverse();
-    var head = h('tr', null, ['Date', 'Time range', 'Contractors', 'Reviewed', 'File', ''].map(function (t, i) {
+    var cols = isAdmin() ? ['Date', 'Time range', 'Contractors', 'Reviewed', 'File', ''] : ['Date', 'Time range', 'Contractors', 'Reviewed'];
+    var head = h('tr', null, cols.map(function (t, i) {
       return h('th', { class: i === 2 || i === 3 ? 'r' : '', text: t });
     }));
     var body = h('tbody', null, list.map(function (r) {
@@ -954,14 +995,20 @@ function findHeadlines(items) {
       } else {
         cell = h('div', { class: 'rowend' }, [h('button', { class: 'btn', type: 'button', text: 'Remove', onclick: function () { state.confirmDel = r.id; renderReports(); } })]);
       }
-      return h('tr', null, [
+      var cells = [
         h('td', { class: 'num', text: longDate(r.date) }),
         h('td', { text: r.start ? fmtTime(r.start) + ' – ' + fmtTime(r.end) : 'Not recorded' }),
         h('td', { class: 'r num', text: String(r.rows.length) }),
-        h('td', { class: 'r num', text: fmtInt(rev) }),
-        h('td', { class: 'em muted', text: r.source || '' }),
-        h('td', null, [cell])
-      ]);
+        h('td', { class: 'r num', text: fmtInt(rev) })
+      ];
+      if (isAdmin()) {
+        var fileCell = r.driveUrl
+          ? h('a', { href: r.driveUrl, target: '_blank', rel: 'noopener', text: r.source || 'Open PDF' })
+          : h('span', { text: r.source || '' });
+        cells.push(h('td', { class: 'em muted' }, [fileCell]));
+        cells.push(h('td', null, [cell]));
+      }
+      return h('tr', null, cells);
     }));
     box.appendChild(h('table', null, [h('thead', null, [head]), body]));
   }
@@ -1005,6 +1052,9 @@ function findHeadlines(items) {
   $('latest').addEventListener('click', function () { var l = latestDate(); if (l) { state.anchor = l; renderAll(); } });
   $('shiftFilter').addEventListener('change', function () { state.shiftFilter = this.value; renderAll(); });
   $('csv').addEventListener('click', exportCsv);
+  $('signout').addEventListener('click', function () {
+    api('POST', '/api/logout', {}).catch(function () {}).then(function () { location.href = '/login'; });
+  });
   $('who').addEventListener('change', function () { state.who = this.value; drawTrend(); });
   $('thr').addEventListener('input', function () { lsSet(LS_THR, this.value); renderTable(); drawTrend(); });
   var savedThr = lsGet(LS_THR); if (savedThr !== null && savedThr !== '') $('thr').value = savedThr;
