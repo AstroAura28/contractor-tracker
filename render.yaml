@@ -11,10 +11,22 @@ services:
         fromDatabase:
           name: contractor-review-db
           property: connectionString
-      - key: APP_USER
-        value: team
+      # Only used to create the very first admin account (when there are no users yet).
+      - key: ADMIN_EMAIL
+        sync: false
       - key: APP_PASSWORD
-        sync: false # you will be asked for this value when creating the Blueprint
+        sync: false
+      # Google Drive (optional, see DRIVE_SETUP.md). Leave empty to skip storing PDFs.
+      - key: GOOGLE_DRIVE_FOLDER_ID
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REFRESH_TOKEN
+        sync: false
 
 databases:
   - name: contractor-review-db
