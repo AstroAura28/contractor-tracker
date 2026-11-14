@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manage access – Contractor Review Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+:root {
+  --bg: #f2f5f8; --surface: #ffffff; --surface-2: #e8edf3; --fg: #16202b; --muted: #566475;
+  --line: #d6dde6; --accent: #0a6c8c; --accent-fg: #ffffff; --accent-soft: #dceff5;
+  --good: #1b7a46; --good-soft: #dff3e7; --warn: #8f5500; --warn-soft: #fbeccb; --bad: #b3261e; --bad-soft: #fbe0dd;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-head: "Space Grotesk", "Inter", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e141b; --surface: #17202a; --surface-2: #212c38; --fg: #e6ebf1; --muted: #9aa7b6;
+    --line: #2b3745; --accent: #4cc0e0; --accent-fg: #06222b; --accent-soft: #143542;
+    --good: #5fd08c; --good-soft: #163a27; --warn: #f0b34a; --warn-soft: #3b2d12; --bad: #ff8a80; --bad-soft: #431e1b;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 20px max(16px, env(safe-area-inset-right)) 48px max(16px, env(safe-area-inset-left)); background: var(--bg); color: var(--fg); font: 14px/1.5 var(--font-body); }
+.wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+h1, h2 { font-family: var(--font-head); margin: 0; }
+h1 { font-size: 26px; line-height: 1.2; }
+h2 { font-size: 17px; }
+p { margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 16px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.panel-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.panel-body { padding: 16px; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 7px 13px; font-weight: 500; text-decoration: none; display: inline-block; color: inherit; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { color: var(--bad); border-color: var(--bad); }
+.btn[disabled] { opacity: .5; cursor: not-allowed; }
+.grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px 24px; }
+@media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.field label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+input[type=text], input[type=email], select, textarea { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; min-height: 36px; width: 100%; }
+textarea { min-height: 96px; resize: vertical; }
+.pw { display: flex; gap: 8px; }
+.pw input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.notice { padding: 8px 12px; border-radius: 6px; font-size: 13px; margin-top: 12px; }
+.notice.ok { background: var(--good-soft); color: var(--good); }
+.notice.warn { background: var(--warn-soft); color: var(--warn); }
+.notice.bad { background: var(--bad-soft); color: var(--bad); }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 640px; }
+th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: 0; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; white-space: nowrap; }
+td .em { overflow-wrap: anywhere; font-weight: 600; }
+.pill { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.pill.good { background: var(--good-soft); color: var(--good); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.rowend { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; align-items: center; }
+.rowend input { width: 170px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.empty { padding: 28px 16px; text-align: center; color: var(--muted); }
+#toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 6px; font-weight: 500; max-width: calc(100% - 32px); z-index: 20; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Manage access</h1>
+      <p class="muted">Add people, choose what they can do, and set temporary passwords.</p>
+    </div>
+    <div class="row">
+      <span id="me" class="muted small"></span>
+      <a class="btn" href="/">Back to dashboard</a>
+      <button id="signout" class="btn" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="panel" aria-label="Add people">
+      <div class="panel-head"><h2>Add people</h2></div>
+      <div class="panel-body">
+        <form id="addForm">
+          <div class="field">
+            <label for="emails">Email addresses (one per line, or separated by commas)</label>
+            <textarea id="emails" placeholder="name@company.com" required></textarea>
+          </div>
+          <div class="field">
+            <label for="role">Access level</label>
+            <select id="role">
+              <option value="contractor">Contractor: can only view the performance dashboard</option>
+              <option value="admin">Admin: can also upload and remove reports, and manage access</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="temp">Temporary password (8+ characters)</label>
+            <div class="pw">
+              <input id="temp" type="text" autocomplete="off" minlength="8" required>
+              <button id="gen" class="btn" type="button">Generate</button>
+            </div>
+            <span class="muted small">Everyone added here gets this password. They must choose their own the first time they sign in.</span>
+          </div>
+          <button id="addBtn" class="btn primary" type="submit">Add people</button>
+        </form>
+        <div id="addResult" hidden></div>
+      </div>
+    </section>
+
+    <section class="panel" aria-label="Google Drive">
+      <div class="panel-head"><h2>Google Drive</h2></div>
+      <div class="panel-body">
+        <p id="driveStatus" class="muted">Checking</p>
+        <div class="row" style="margin-top:12px">
+          <button id="driveTest" class="btn" type="button" hidden>Test connection</button>
+        </div>
+        <p id="driveMsg" class="notice" hidden></p>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel" aria-label="People">
+    <div class="panel-head"><h2>People with access</h2><span id="count" class="muted small"></span></div>
+    <div id="people" class="scroll"></div>
+  </section>
+</div>
+<div id="toast" role="status" hidden></div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var users = [], resetFor = '', removeFor = '', lastAdd = null;
+
+  function h(tag, props, kids) {
+    var e = document.createElement(tag);
+    Object.keys(props || {}).forEach(function (k) {
+      var v = props[k];
+      if (k === 'class') e.className = v;
+      else if (k === 'text') e.textContent = v;
+      else if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), v);
+      else if (v === true) e.setAttribute(k, '');
+      else if (v !== false && v != null) e.setAttribute(k, v);
+    });
+    (kids || []).forEach(function (c) { if (c != null) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    return e;
+  }
+  function toast(msg) {
+    var t = $('toast'); t.textContent = msg; t.hidden = false;
+    clearTimeout(toast.t); toast.t = setTimeout(function () { t.hidden = true; }, 3200);
+  }
+  function api(method, url, body) {
+    var opts = { method: method, credentials: 'same-origin', headers: {} };
+    if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    return fetch(url, opts).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (res.status === 401 || (res.status === 403 && data.mustChange)) { location.href = '/login'; throw new Error('redirect'); }
+        if (res.status === 403) { location.href = '/'; throw new Error('redirect'); }
+        if (!res.ok) throw new Error(data.error || ('Something went wrong (' + res.status + ')'));
+        return data;
+      });
+    });
+  }
+  function genPassword() {
+    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789', out = '';
+    var buf = new Uint32Array(12); crypto.getRandomValues(buf);
+    for (var i = 0; i < buf.length; i++) out += chars[buf[i] % chars.length];
+    return out;
+  }
+  function fmtDate(s) {
+    if (!s) return 'Never';
+    var d = new Date(s);
+    return isNaN(d) ? 'Never' : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+  function copy(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).then(function () { toast('Copied'); }, function () { toast('Could not copy. Select the text and copy it.'); });
+    }
+    toast('Could not copy. Select the text and copy it.');
+  }
+
+  function renderPeople() {
+    var box = $('people'); box.textContent = '';
+    $('count').textContent = users.length ? users.length + (users.length === 1 ? ' person' : ' people') : '';
+    if (!users.length) { box.appendChild(h('div', { class: 'empty', text: 'Nobody yet.' })); return; }
+    var head = h('tr', null, ['Email', 'Access level', 'Status', 'Last sign-in', ''].map(function (t) { return h('th', { text: t }); }));
+    var body = h('tbody', null, users.map(function (u) {
+      var roleSel = h('select', { 'aria-label': 'Access level for ' + u.email, disabled: u.you, onchange: function () {
+        var sel = this, prev = u.role;
+        api('PATCH', '/api/users/' + encodeURIComponent(u.email), { role: sel.value }).then(function () {
+          u.role = sel.value; toast('Access level updated');
+        }).catch(function (e) { sel.value = prev; toast(e.message); });
+      } }, [
+        h('option', { value: 'contractor', text: 'Contractor' }),
+        h('option', { value: 'admin', text: 'Admin' })
+      ]);
+      roleSel.value = u.role;
+      var cell;
+      if (u.you) {
+        cell = h('div', { class: 'rowend' }, [h('span', { class: 'muted small', text: 'This is you' })]);
+      } else if (resetFor === u.email) {
+        var inp = h('input', { type: 'text', value: genPassword(), 'aria-label': 'New temporary password', autocomplete: 'off' });
+        cell = h('div', { class: 'rowend' }, [
+          inp,
+          h('button', { class: 'btn', type: 'button', text: 'New', onclick: function () { inp.value = genPassword(); } }),
+          h('button', { class: 'btn primary', type: 'button', text: 'Set', onclick: function () {
+            api('PATCH', '/api/users/' + encodeURIComponent(u.email), { tempPassword: inp.value }).then(function () {
+              resetFor = ''; u.mustChange = true; renderPeople();
+              toast('Temporary password set. Share it with ' + u.email);
+              copy(inp.value);
+            }).catch(function (e) { toast(e.message); });
+          } }),
+          h('button', { class: 'btn', type: 'button', text: 'Cancel', onclick: function () { resetFor = ''; renderPeople(); } })
+        ]);
+      } else if (removeFor === u.email) {
+        cell = h('div', { class: 'rowend' }, [
+          h('button', { class: 'btn danger', type: 'button', text: 'Remove access', onclick: function () {
+            api('DELETE', '/api/users/' + encodeURIComponent(u.email)).then(function () {
+              removeFor = ''; return load();
+            }).then(function () { toast('Access removed'); }).catch(function (e) { toast(e.message); });
+          } }),
+          h('button', { class: 'btn', type: 'button', text: 'Keep', onclick: function () { removeFor = ''; renderPeople(); } })
+        ]);
+      } else {
+        cell = h('div', { class: 'rowend' }, [
+          h('button', { class: 'btn', type: 'button', text: 'Reset password', onclick: function () { resetFor = u.email; removeFor = ''; renderPeople(); } }),
+          h('button', { class: 'btn', type: 'button', text: 'Remove', onclick: function () { removeFor = u.email; resetFor = ''; renderPeople(); } })
+        ]);
+      }
+      return h('tr', null, [
+        h('td', null, [h('div', { class: 'em', text: u.email })]),
+        h('td', null, [roleSel]),
+        h('td', null, [u.mustChange ? h('span', { class: 'pill warn', text: 'Temporary password' }) : h('span', { class: 'pill good', text: 'Active' })]),
+        h('td', { class: 'muted', text: fmtDate(u.lastLoginAt) }),
+        h('td', null, [cell])
+      ]);
+    }));
+    box.appendChild(h('table', null, [h('thead', null, [head]), body]));
+  }
+
+  function load() {
+    return api('GET', '/api/users').then(function (list) { users = list; renderPeople(); });
+  }
+
+  function showAddResult(r, role, temp) {
+    var box = $('addResult'); box.textContent = ''; box.hidden = false;
+    var parts = [];
+    if (r.added.length) parts.push(r.added.length + ' added');
+    if (r.existing.length) parts.push(r.existing.length + ' already had access (not changed)');
+    if (r.invalid.length) parts.push('not valid emails: ' + r.invalid.join(', '));
+    box.appendChild(h('p', { class: 'notice ' + (r.invalid.length || r.existing.length ? 'warn' : 'ok'), text: parts.join('. ') + '.' }));
+    if (r.added.length) {
+      var msg = 'You now have access to the Contractor Review Tracker.\nSign in at ' + location.origin + '/login\nEmail: your work email\nTemporary password: ' + temp + '\nYou will be asked to choose your own password the first time you sign in.';
+      box.appendChild(h('div', { class: 'row', style: 'margin-top:10px' }, [
+        h('button', { class: 'btn', type: 'button', text: 'Copy sign-in instructions', onclick: function () { copy(msg); } })
+      ]));
+    }
+  }
+
+  $('gen').addEventListener('click', function () { $('temp').value = genPassword(); });
+  $('addForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var temp = $('temp').value;
+    $('addBtn').disabled = true;
+    api('POST', '/api/users', { emails: $('emails').value, role: $('role').value, tempPassword: temp }).then(function (r) {
+      showAddResult(r, $('role').value, temp);
+      if (r.added.length) { $('emails').value = ''; }
+      return load();
+    }).catch(function (err) {
+      var box = $('addResult'); box.hidden = false; box.textContent = '';
+      box.appendChild(h('p', { class: 'notice bad', text: err.message }));
+    }).then(function () { $('addBtn').disabled = false; });
+  });
+
+  $('signout').addEventListener('click', function () {
+    api('POST', '/api/logout', {}).catch(function () {}).then(function () { location.href = '/login'; });
+  });
+
+  $('driveTest').addEventListener('click', function () {
+    var msg = $('driveMsg'); msg.hidden = true; $('driveTest').disabled = true;
+    api('POST', '/api/drive/test', {}).then(function (r) {
+      msg.className = 'notice ok'; msg.textContent = 'Connected. New PDFs will be saved to the folder "' + r.folder + '".';
+    }).catch(function (e) {
+      msg.className = 'notice bad'; msg.textContent = e.message;
+    }).then(function () { msg.hidden = false; $('driveTest').disabled = false; });
+  });
+
+  $('temp').value = genPassword();
+  api('GET', '/api/me').then(function (me) {
+    $('me').textContent = 'Signed in as ' + me.email;
+    $('driveStatus').textContent = me.drive
+      ? 'Every report you save also stores its original PDF in your Google Drive folder.'
+      : 'Not connected. Reports save normally, but the PDFs are not stored in Drive yet. See DRIVE_SETUP.md.';
+    $('driveTest').hidden = !me.drive;
+    return load();
+  }).catch(function (e) { if (e.message !== 'redirect') toast(e.message); });
+})();
+</script>
+</body>
+</html>
